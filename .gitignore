@@ -1,0 +1,13 @@
+# Secrets — never commit
+.env
+.env.*
+!.env.example
+
+# Vercel
+.vercel
+
+# Dependencies
+node_modules
+
+# OS / editor noise
+.DS_Store
