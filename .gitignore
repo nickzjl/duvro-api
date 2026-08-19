@@ -11,3 +11,6 @@ node_modules
 
 # OS / editor noise
 .DS_Store
+
+# Local photo folders for tools/curate-test.mjs — never commit real photos
+test-photos/

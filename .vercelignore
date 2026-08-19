@@ -1,0 +1,5 @@
+# Dev-only tooling — must never reach the deployed function.
+tools/
+
+# Local photo folders used with tools/curate-test.mjs
+test-photos/

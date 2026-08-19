@@ -164,6 +164,84 @@ fill it in. `.env*` is gitignored.
 
 Deploy with `vercel` — this repo does not deploy itself.
 
+## Testing the prompts with real photos
+
+`tools/curate-test.mjs` sends a folder of real photos through the deployed
+endpoint, so the prompts can be judged on real images instead of hand-pasted
+base64. It is a **dev tool only** — excluded from deploys via `.vercelignore`,
+writes nothing to the repo, and prints base64 and responses to stdout only.
+
+```bash
+node tools/curate-test.mjs ./test-photos --pack golden_hour --tier basic --url https://YOUR-DEPLOYMENT.vercel.app
+```
+
+`--url` may be replaced by a `DUVRO_API_URL` env var. Add `--dry-run` to build
+the payload and see the size and derived metrics without spending an API call.
+Other flags: `--max-dim` (long edge, default 512) and `--quality` (JPEG, default 70).
+
+Each photo is downsampled to 512px on the long edge and re-encoded as JPEG.
+Photos are sent with **opaque ids** (`p01`, `p02`, …), not filenames, so the model
+can't take hints from names the way it never could in production — the tool prints
+the filename next to every returned id for you. It also reports request size,
+wall-clock time, and the carousel length the model chose.
+
+`test-photos/` is gitignored, so that's the safe place to drop real photos.
+
+**macOS only:** image work uses the built-in `sips`, which is what keeps the
+dependency count at zero. On Linux, swap the two `sips` calls in `prepareImage`
+for ImageMagick.
+
+### What the tool derives, and what you supply
+
+Derived from each file: **width/height** (the original's dimensions, corrected for
+EXIF orientation) and **timestamp** (EXIF `DateTimeOriginal` → Spotlight capture
+date → file mtime, whichever lands first; the source is printed per photo).
+
+Note `sips` strips the EXIF orientation tag without rotating the pixels, so the
+tool applies the rotation itself. Without that, portrait photos would reach the
+model on their side.
+
+Everything else has no honest source in a bare file, so it comes from a **sidecar**
+in the photo folder — `metrics.json` or `metrics.csv`, whichever is present
+(`.json` wins if both are). Fill it in to match what Vision would actually produce.
+
+`metrics.json` — keyed by filename:
+
+```json
+{
+  "IMG_0001.jpg": {
+    "category": "people",
+    "faceCount": 2,
+    "faceQuality": 0.82,
+    "largestFaceAreaRatio": 0.31,
+    "clusterID": "cluster_a"
+  },
+  "IMG_0002.jpg": {
+    "category": "place",
+    "faceCount": 0,
+    "faceQuality": 0.0,
+    "largestFaceAreaRatio": 0.0,
+    "clusterID": "cluster_b"
+  }
+}
+```
+
+`metrics.csv` — one row per photo, header required:
+
+```csv
+filename,category,faceCount,faceQuality,largestFaceAreaRatio,clusterID
+IMG_0001.jpg,people,2,0.82,0.31,cluster_a
+IMG_0002.jpg,place,0,0,0,cluster_b
+```
+
+Any photo missing from the sidecar — or any individual field left blank — falls
+back to a clearly-marked neutral default (`category: "unknown"`, the three face
+numbers `0`, and a **unique** `clusterID` per photo, so absent data never reads as
+"these are all near-duplicates"). The tool prints a warning naming exactly which
+photos and fields got defaults, and marks them `DEFAULT` or `sidecar*` in the
+prep table. With no sidecar at all it says so plainly: face-aware prompt
+behaviour is not being exercised.
+
 ## Test it
 
 Two photos, golden hour, basic tier. Replace the host with your deployment URL.
