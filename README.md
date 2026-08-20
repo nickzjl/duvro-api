@@ -143,18 +143,64 @@ deployment.
 The carousel range was changed from 4–20 to 4–10 in all six, including the worked
 examples that referenced counts above 10. Everything else is verbatim.
 
-### Enabling prompt caching
+### Prompt caching
 
-All six prompts are 2,700–4,700 tokens, well above Sonnet 4.6's 1,024-token
-minimum, and the system prompt is the stable prefix. To turn caching on, add one
-field in [api/curate.js](api/curate.js):
+**On.** `system` in [api/curate.js](api/curate.js) carries a `cache_control:
+{ type: 'ephemeral' }` breakpoint on its one text block:
 
 ```js
 system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
 ```
 
-Cache reads cost ~0.1× and writes ~1.25×, so this pays off from the second request
-with the same pack+tier inside the 5-minute TTL. It is left off for now.
+This is safe to cache because `loadSystemPrompt` returns each prompt file's
+contents verbatim — no per-request interpolation (no date, no id, no
+per-user text) — so every call for the same `(vibePack, tier)` pair renders
+a byte-identical prefix. `messages` (the photos) is never cached; it's
+different on every call by design.
+
+**Minimum cacheable length.** `claude-sonnet-4-6`'s minimum is **1,024
+tokens** — shorter prefixes silently don't cache (no error, just
+`cache_creation_input_tokens: 0`). All six prompts clear it comfortably:
+
+| Prompt | Est. tokens |
+| --- | ---: |
+| `travel_film.basic.txt` | ~2,700 |
+| `digicam.premium.txt` | ~2,730 |
+| `travel_film.premium.txt` | ~2,980 |
+| `digicam.basic.txt` | ~3,120 |
+| `golden_hour.premium.txt` | ~3,880 |
+| `golden_hour.basic.txt` | ~4,740 |
+
+None fall below the minimum — the smallest still clears it by 2.6×. (Token
+counts are a chars/4 estimate, not a `messages.count_tokens` call — no API
+key was available locally to verify exactly. Confirm the real figures from
+`usage.cache_creation_input_tokens` on the first live call per pack+tier;
+the estimate is unlikely to be off by more than ~10%.)
+
+**Expected per-call saving.** At `claude-sonnet-4-6`'s $3.00/1M input rate,
+a cache **read** costs ~0.1× ($0.30/1M) and a cache **write** (the default
+5-minute TTL) costs ~1.25× ($3.75/1M) — so the very first call to a given
+pack+tier pair, or any call after a 5-minute gap, costs slightly *more*
+(~$0.0025–0.0036, ~0.25–0.36¢, depending on which prompt) than before
+caching. Every call after that within the TTL is a hit:
+
+- **On just the cached slice:** ~90% off, ~$0.007–0.013 (~0.7–1.3¢) saved
+  per call depending on prompt size, ~$0.009 average.
+- **On the whole call:** for a representative ~30-photo request (the
+  shortlist's usual size), the system prompt is roughly a fifth of total
+  input tokens — the photos and their metrics dominate, at ~300–400 tokens
+  per downsampled thumbnail plus ~75 for its metrics text. That puts the
+  *whole-call* input saving at roughly **20%** once warm, not 90% — the 90%
+  figure is real but only applies to the ~3,360-token slice caching
+  actually touches, not the photo payload sitting after it.
+
+Two hits already beat two uncached calls outright (write 1.25× + read 0.1×
+= 1.35× vs. 2× at full price for two calls) — this pays for itself fast
+under any real traffic pattern, including a single retry.
+
+Verify hits are actually landing via `usage.cache_read_input_tokens` in the
+Anthropic response (not logged — see Privacy invariants above; check it
+manually against a raw response during testing, not in production).
 
 ## Setup
 

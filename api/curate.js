@@ -264,7 +264,15 @@ async function callAnthropic({ apiKey, systemPrompt, photos }) {
         max_tokens: MAX_TOKENS,
         // The pack/tier prompt goes here, not in a user turn. It is the
         // stable prefix, which is what makes prompt caching possible.
-        system: [{ type: 'text', text: systemPrompt }],
+        // cache_control marks it as a breakpoint: identical (vibePack, tier)
+        // requests within the TTL reuse this prefix at ~0.1x its input
+        // price instead of paying full price every time. loadSystemPrompt
+        // returns the raw file contents verbatim (no per-request
+        // interpolation -- no date, no id), so the same pair always
+        // renders byte-identical, which prompt caching requires. See
+        // README's "Enabling prompt caching" section for the token-count
+        // verification and expected savings.
+        system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
         messages: [{ role: 'user', content: buildPhotoContent(photos) }],
       }),
     });
