@@ -407,3 +407,185 @@ curl -sS -i https://YOUR-DEPLOYMENT.vercel.app/api/curate
 ```bash
 curl -sS -X POST https://YOUR-DEPLOYMENT.vercel.app/api/curate -H 'Content-Type: application/json' -d '{"photos":[],"tier":"gold","vibePack":"golden-hour"}'
 ```
+
+## App Attest — investigated, not built
+
+**The real defense.** IP rate limiting (above) falls to anyone behind a
+shared/rotating proxy, and any secret embedded in the shipped IPA can be
+extracted and replayed from anywhere else. App Attest is the one mechanism
+that actually proves a request came from the genuine duvro binary running
+on genuine Apple hardware, cryptographically, not by anything an attacker
+could read out of the app bundle.
+
+**Verdict up front: this is a real multi-day project, not a session.** The
+crypto verification alone (below) has no Node stdlib shortcut for one of
+its two parts, the storage is a new external dependency this repo doesn't
+have today, and there's no lighter-weight option that gets "most" of the
+benefit — every cheaper alternative either doesn't survive IPA extraction
+or doesn't prove app identity at all. None of what follows is implemented;
+this section exists so that project can be scoped confidently later.
+
+### The full flow
+
+**Once per device — attestation:**
+1. App calls `DCAppAttestService.shared.generateKey()`. The Secure Enclave
+   generates an ES256 (ECDSA P-256) key pair it never exposes; the app
+   gets back an opaque `keyId` string.
+2. App calls `attestKey(keyId, clientDataHash:)`, where `clientDataHash` is
+   SHA-256 of a server-issued one-time challenge. This is the one call
+   that talks to Apple's servers — it returns a CBOR **attestation
+   object**: an X.509 certificate chain for the key (`attStmt.x5c`) plus
+   `authenticatorData` (RP ID hash, a counter, an AAGUID, the credential
+   ID).
+3. App sends the attestation object + the `keyId` to our server, once.
+4. **Server verifies, on this first call only:**
+   - `x5c` chains to Apple's App Attest root CA (pinned, not just "any
+     valid cert") — signatures, validity period, basic constraints.
+   - A nonce computed as `SHA256(authenticatorData ‖ clientDataHash)`
+     matches the value embedded in a specific `credCert` extension (OID
+     `1.2.840.113635.100.8.2`) — this is what ties the certificate to
+     *our* challenge, not a replayed one from elsewhere.
+   - `authenticatorData`'s RP ID hash = `SHA256(TeamID + "." + BundleID)`
+     — this app, not some other app on the same device.
+   - `authenticatorData`'s counter = **0** (only true at first attestation).
+   - `authenticatorData`'s AAGUID = `appattestdevelop` (dev) or `appattest`
+     + seven `0x00` bytes (production).
+   - `authenticatorData`'s credential ID = the `keyId` the app sent.
+   - On success: **store `keyId → { publicKey, counter: 0 }`** (extracted
+     from the verified cert). This record is the entire point of the
+     storage requirement below.
+
+**Every subsequent call — assertion (cheap, no Apple network round-trip):**
+1. App calls `generateAssertion(keyId, clientDataHash:)`. Recommended
+   `clientData` here is a hash of **the actual request body about to be
+   sent** (the photos+metrics JSON), not a separately-fetched server
+   nonce — Apple's own guidance allows this, and it avoids a second round
+   trip per curation call for no security cost, since every request body
+   already differs. This is a local Secure Enclave sign — no network call
+   to Apple at all.
+2. App sends `{ assertion, keyId, requestBody }` (the assertion rides
+   alongside the normal curation payload, doesn't replace it).
+3. **Server verifies, on every call:**
+   - Recomputes `clientDataHash` from the received request body.
+   - Recomputes `nonce = SHA256(authenticatorData ‖ clientDataHash)`.
+   - Verifies the ES256 signature over `nonce` using the **public key
+     stored at attestation time** for this `keyId`.
+   - Re-checks the RP ID hash.
+   - Verifies `authenticatorData`'s counter **strictly increased** since
+     the last value stored for this `keyId`, then stores the new value.
+     This is the replay/cloning defense: a captured-and-replayed
+     assertion reuses the same counter value and is rejected; a cloned
+     Secure Enclave (not possible in practice, but the threat model
+     assumes it) would race two divergent counters and get caught the
+     first time either one repeats.
+
+### Storage
+
+The server must persist, per device: `keyId` (string, primary key),
+`publicKey` (the verified P-256 public key, ~65–91 bytes), `counter`
+(integer). No TTL needed — a device's attestation is valid for the life
+of that install, not a session.
+
+**Vercel functions are stateless — `@vercel/kv` no longer exists as a
+product.** The current path (confirmed against Vercel's own storage
+guidance) is **Upstash Redis via the Vercel Marketplace**
+(`vercel integration add upstash`, then `@upstash/redis` — auto-provisions
+and injects env vars into the project). This is the same category of store
+the rate-limiting section above would need for an in-function counter, if
+that were ever built instead of the WAF rule.
+
+**Free tier (Upstash, confirmed against their current pricing, not
+assumed):** 256 MB storage, 500K commands/month, 10 GB bandwidth/month, up
+to 10 databases, 10,000 commands/sec burst. A device record is a few
+hundred bytes and costs 2 Redis ops per curation call (one `GET` to fetch
+the stored key+counter, one `SET` to persist the new counter) — even at
+thousands of daily active devices, this stays well inside the free tier;
+storage alone would hold low hundreds of thousands of device records
+before approaching 256 MB. Cost is not the blocker here — the
+implementation work is.
+
+### What the iOS app needs
+
+- Add the **App Attest** capability in Xcode (Signing & Capabilities → +
+  Capability). This is a standard managed capability — Xcode writes the
+  `com.apple.developer.devicecheck.appattest-environment` entitlement
+  (`development` or `production`, matching the build config) and no
+  further Apple approval process is required beyond the existing paid
+  Developer Program membership duvro already has. Not gated behind a
+  special capability request the way some entitlements are.
+- `DCAppAttestService` calls: `generateKey()` once at first launch (or
+  first curation attempt), `attestKey()` once per device (send the
+  challenge/attestation round trip to our server), then
+  `generateAssertion()` on every curation call. `keyId` persists in the
+  Keychain, not `UserDefaults` (survives reinstall the same way other
+  Keychain-stored state would, which may or may not be desired — worth a
+  deliberate decision, not a default).
+- iOS 14+ requirement, comfortably covered by duvro's iOS 18 minimum.
+
+### Latency
+
+**No meaningful latency added to the curation call itself, if staged
+correctly.** The two operations differ enormously:
+- `generateKey()` + `attestKey()` (once per device) do talk to Apple's
+  servers and are the "slow" part — real-world reports put this at
+  roughly 1–3 seconds, sometimes more on a cold network. This should run
+  **proactively, off the critical path** — e.g., during import or vibe-pack
+  browsing, the same pattern `CurationService.prewarmCellularPermission()`
+  already uses for the cellular-permission dialog — never synchronously
+  blocking the first real curation attempt.
+- `generateAssertion()` (every call) is a **local Secure Enclave sign, no
+  network round-trip to Apple at all** — sub-100ms in practice. Server-side
+  verification is a hash, one ECDSA signature check, and two Redis ops —
+  all comfortably under 10ms combined. Against a call that already takes
+  20–60s end to end, this is noise.
+
+The only way this adds real latency is doing the one-time attestation
+synchronously inside the curation request path instead of ahead of time —
+worth calling out explicitly as the mistake to avoid, not a risk in the
+mechanism itself.
+
+### Is there a lighter-weight option?
+
+**Honestly: no, not one that gets "most" of the actual benefit.** Every
+cheaper alternative considered either fails the exact threat this is
+meant to stop (extraction from the shipped IPA) or proves a different,
+weaker thing:
+
+- **A static embedded token or client-cert pin** — already the thing this
+  is explicitly replacing; extractable from the IPA like any other
+  embedded secret, no better than what exists today.
+- **DeviceCheck** (`DCDevice.current.generateToken()`, App Attest's older,
+  simpler sibling) — genuinely lighter (no key generation/attestation
+  ceremony, just a persistent 2-bit per-device flag Apple stores for you)
+  but proves a different thing: "this is a genuine Apple device," not
+  "this specific request came from this specific genuine app binary." It
+  has no per-request signature and doesn't verify app integrity at all —
+  it's the right tool for "has this device already used its free tier"
+  (already the plan for a future paid tier, per CLAUDE.md), not for
+  authenticating the curation endpoint.
+- **Rate limiting + the spend cap** (this session) are real and worth
+  having regardless, but they bound *damage*, not *authenticity* — they
+  don't stop a request that's shaped exactly like a real one, at a rate
+  under the limit.
+
+The one thing that IS optional, not fundamental: keeping this at **zero
+runtime dependencies** specifically. Node's `crypto` module (`X509Certificate`)
+can walk and verify the certificate chain without a new dependency, but
+there's no built-in CBOR decoder — the attestation object's CBOR structure
+is small and fixed (a map of `fmt`/`attStmt`/`authData`), so a
+purpose-built minimal reader is realistic without a full CBOR library, but
+it's still code to write and get right. Accepting one or two small,
+well-maintained dependencies (a CBOR parser, possibly a verification
+library — several exist on npm for App Attest specifically) would cut
+real implementation time at the cost of the dependency-count invariant
+this repo currently holds. That trade should be made deliberately when
+this is actually scheduled, not decided here.
+
+### Recommended sequencing (not a technical alternative — a priority call)
+
+Given the real cost above, ship rate limiting + the spend cap now (this
+session), and treat App Attest as its own scoped project once real
+traffic volume makes the residual risk (a static-token-equivalent bypass,
+or IP-limit evasion via rotating proxies) worth the implementation cost —
+not before. This is a sequencing recommendation, not a claim that the risk
+is fully covered in the meantime.
