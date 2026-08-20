@@ -11,6 +11,12 @@
  *   - ANTHROPIC_API_KEY is read from the environment only; never logged,
  *     never written to a file, never included in a response
  *   - validation errors reference field *paths*, never field *values*
+ *   - ONE narrow, explicit exception: numeric prompt-cache usage counts
+ *     (cache_creation_input_tokens, cache_read_input_tokens, input_tokens,
+ *     output_tokens -- never photo data or the model's text response) can be
+ *     console.logged, gated behind LOG_CACHE_USAGE=1, and/or echoed back in
+ *     the response as `_cacheDebug`, gated behind an x-debug-cache-usage
+ *     request header -- both off by default, for diagnosing cache hit rates.
  */
 
 import { loadSystemPrompt, VIBE_PACKS, TIERS } from '../lib/prompts.js';
@@ -87,6 +93,16 @@ export default async function handler(req, res) {
   const systemPrompt = loadSystemPrompt(body.vibePack, body.tier);
   const knownIds = new Set(body.photos.map((p) => p.id));
 
+  // Debug-only, opt-in cache diagnosis (see "Prompt caching" in the README).
+  // Both gates are numeric-usage-only -- no photo/request/model-response
+  // content ever passes through either path, so the privacy invariants
+  // above are unaffected: LOG_CACHE_USAGE controls a server-side console.log
+  // of usage counts, and the request header controls whether those same
+  // counts are echoed back in this response for a caller (the local dev
+  // tool) to read directly, without needing log access.
+  const logCacheUsage = process.env.LOG_CACHE_USAGE === '1';
+  const cacheDebugRequested = req.headers?.['x-debug-cache-usage'] === '1';
+
   let upstream;
   try {
     upstream = await callAnthropic({ apiKey, systemPrompt, photos: body.photos });
@@ -102,6 +118,16 @@ export default async function handler(req, res) {
       code: 'upstream_error',
       upstreamStatus: err?.upstreamStatus ?? null,
     });
+  }
+
+  if (logCacheUsage) {
+    const u = upstream.usage ?? {};
+    console.log(
+      '[cache] cache_creation_input_tokens=%s cache_read_input_tokens=%s ' +
+      'input_tokens=%s output_tokens=%s vibePack=%s tier=%s',
+      u.cache_creation_input_tokens, u.cache_read_input_tokens,
+      u.input_tokens, u.output_tokens, body.vibePack, body.tier,
+    );
   }
 
   if (upstream.stopReason === 'max_tokens') {
@@ -135,6 +161,16 @@ export default async function handler(req, res) {
       reason: 'schema_mismatch',
       details: schemaErrors.slice(0, MAX_ERRORS),
     });
+  }
+
+  if (cacheDebugRequested) {
+    const u = upstream.usage ?? {};
+    parsed._cacheDebug = {
+      cache_creation_input_tokens: u.cache_creation_input_tokens ?? null,
+      cache_read_input_tokens: u.cache_read_input_tokens ?? null,
+      input_tokens: u.input_tokens ?? null,
+      output_tokens: u.output_tokens ?? null,
+    };
   }
 
   return send(res, 200, parsed);
@@ -299,7 +335,9 @@ async function callAnthropic({ apiKey, systemPrompt, photos }) {
     .map((b) => b.text)
     .join('');
 
-  return { text, stopReason: payload.stop_reason ?? null };
+  // usage is numeric-only (token counts) -- never photo/response content --
+  // see the debug-logging gates in the handler above for where this is read.
+  return { text, stopReason: payload.stop_reason ?? null, usage: payload.usage ?? null };
 }
 
 /**

@@ -11,8 +11,11 @@ Zero runtime dependencies (Node's built-in `fetch`).
 ## Privacy invariants
 
 - The request body is **never logged**, echoed, or written to disk. Neither is
-  the model's response — it describes the user's photos. There is no `console.*`
-  call and no filesystem write anywhere in `api/` or `lib/`.
+  the model's response — it describes the user's photos. The one exception is
+  numeric prompt-cache usage counts (`cache_creation_input_tokens`,
+  `cache_read_input_tokens`, `input_tokens`, `output_tokens` — never photo data
+  or response text) — see "Prompt caching" below for the two opt-in,
+  off-by-default gates.
 - `ANTHROPIC_API_KEY` is read from `process.env` only. It is never logged, never
   written to a file, and never included in a response. Anthropic error bodies are
   drained and discarded rather than forwarded, since they can quote request content.
@@ -198,9 +201,24 @@ Two hits already beat two uncached calls outright (write 1.25× + read 0.1×
 = 1.35× vs. 2× at full price for two calls) — this pays for itself fast
 under any real traffic pattern, including a single retry.
 
-Verify hits are actually landing via `usage.cache_read_input_tokens` in the
-Anthropic response (not logged — see Privacy invariants above; check it
-manually against a raw response during testing, not in production).
+**Verifying hits are actually landing** — two opt-in, off-by-default gates,
+both numeric-only (see Privacy invariants above):
+
+- Set `LOG_CACHE_USAGE=1` in the Vercel project's env vars to have every
+  call `console.log` its `cache_creation_input_tokens` /
+  `cache_read_input_tokens` / `input_tokens` / `output_tokens`, alongside
+  the `vibePack`/`tier` it ran with. Check via `vercel logs`.
+- `tools/curate-test.mjs` always sends `x-debug-cache-usage: 1` (it's a
+  dev tool, never real traffic) and the endpoint echoes those same four
+  numbers back as `_cacheDebug` in its response when that header is
+  present — the tool prints them under "Summary" with a HIT/MISS verdict
+  (`cache_read_input_tokens > 0` → HIT). Real app traffic never sends the
+  header, so it never sees `_cacheDebug` and the response shape stays
+  exactly the model's own JSON for every real caller.
+
+Don't rely on the Anthropic console's Caching page alone while testing —
+it can lag by a few minutes; the response's own `usage` object (via either
+gate above) is the immediate, authoritative source.
 
 ## Setup
 

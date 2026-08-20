@@ -438,7 +438,12 @@ async function main() {
     try {
       res = await fetch(endpoint, {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        // x-debug-cache-usage: this is a dev-only diagnostic tool, so it
+        // always asks for the (opt-in, numeric-only) cache stats -- see
+        // README's "Prompt caching" section. The deployed endpoint ignores
+        // this header entirely unless it recognizes it; real traffic
+        // (the app) never sends it.
+        headers: { 'content-type': 'application/json', 'x-debug-cache-usage': '1' },
         body: bodyText,
       });
       text = await res.text();
@@ -515,6 +520,18 @@ function report(body, byId, secs) {
   console.log(`  insufficientStrongPhotos:  ${body.insufficientStrongPhotos}`);
   console.log(`  alternates / captions:     ${body.alternates?.length ?? 0} / ${body.captions?.length ?? 0}`);
   console.log(`  Wall clock:                ${secs.toFixed(1)}s`);
+
+  const cd = body._cacheDebug;
+  if (cd) {
+    const verdict = cd.cache_read_input_tokens > 0 ? 'HIT'
+      : cd.cache_creation_input_tokens > 0 ? 'MISS (wrote a new cache entry)'
+      : 'no cache activity reported';
+    console.log(`  Cache creation tokens:     ${cd.cache_creation_input_tokens}`);
+    console.log(`  Cache read tokens:         ${cd.cache_read_input_tokens}    <- ${verdict}`);
+    console.log(`  Input tokens (uncached):   ${cd.input_tokens}`);
+  } else {
+    console.log(`  Cache debug:               not returned -- deployed endpoint may predate _cacheDebug support`);
+  }
   console.log();
 }
 
