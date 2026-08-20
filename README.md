@@ -210,6 +210,102 @@ fill it in. `.env*` is gitignored.
 
 Deploy with `vercel` — this repo does not deploy itself.
 
+## Rate limiting
+
+Nothing currently stops a caller from hitting `/api/curate` in a tight loop
+on the shared `ANTHROPIC_API_KEY`. The hard daily spend cap bounds the
+worst case in dollars, but doesn't stop the loop itself. This is a platform
+firewall rule, not application code — **nothing in this repo enforces it**;
+it's configured on Vercel and only documented here.
+
+**The platform feature covers this — no function code needed.** Vercel's
+WAF `rate_limit` custom-rule action runs at the edge, before the function
+executes, so a blocked request never invokes `curate.js` and never reaches
+Anthropic. Confirmed on the **Hobby** plan (checked against the live docs,
+not assumed):
+
+| | Hobby |
+| --- | --- |
+| Custom firewall rules | Up to 3 total |
+| Rate-limit rules specifically | 1 |
+| Counting keys | IP or JA4 digest |
+| Algorithm | Fixed window only (Token bucket is Enterprise) |
+| Window | 10s–**10 min** (Enterprise goes to 1hr) |
+| Included allowed requests | 1,000,000/month, free |
+
+**Rate limiting can't be expressed in `vercel.json`.** Vercel does support
+WAF rules as code there via `routes[].mitigate`, but only for `deny` and
+`challenge` — `rate_limit` (and `log`/`bypass`/`redirect`) are dashboard/CLI
+only. That's why this is a runbook section instead of a diff.
+
+**What the rule actually bounds.** The 10-minute window ceiling means this
+cannot express "a handful of calls per day" as a single native rule — that
+would need a much longer window than Hobby (or even Enterprise, capped at
+1hr) allows. What it *can* do, precisely: stop a tight request loop, which
+is the actual threat described — a legitimate session makes one call and
+waits 20–60s for it, so a real user is nowhere near a per-10-minute cap
+even retrying a few times; a loop calling every 1–2s hits it almost
+immediately and is blocked for the rest of that window. Treat this as
+burst/loop protection layered under the spend cap, not a replacement for
+one — they bound different things.
+
+**Suggested rule** (conservative — 20 requests/IP per 10 minutes on the
+one endpoint that calls Anthropic; adjust `--rate-limit-requests` down if
+real traffic shows room to tighten it):
+
+```bash
+vercel link   # once, if this project isn't linked yet
+
+# Stage 1 — log only, enforces nothing yet
+vercel firewall rules add "Rate limit /api/curate by IP" \
+  --condition '{"type":"path","op":"pre","value":"/api/curate"}' \
+  --condition '{"type":"method","op":"eq","value":"POST"}' \
+  --action rate_limit \
+  --rate-limit-window 600 \
+  --rate-limit-requests 20 \
+  --rate-limit-keys ip \
+  --rate-limit-action log \
+  --yes
+vercel firewall diff
+vercel firewall publish --yes
+```
+
+Watch the Firewall traffic dashboard for a day or so to confirm only
+loop-shaped traffic (or nothing) matches, then tighten to actually enforce:
+
+```bash
+# Stage 2 — same rule, now actually rejects over-limit requests with 429
+vercel firewall rules edit "Rate limit /api/curate by IP" \
+  --condition '{"type":"path","op":"pre","value":"/api/curate"}' \
+  --condition '{"type":"method","op":"eq","value":"POST"}' \
+  --action rate_limit \
+  --rate-limit-window 600 \
+  --rate-limit-requests 20 \
+  --rate-limit-keys ip \
+  --rate-limit-action rate_limit \
+  --yes
+vercel firewall publish --yes
+```
+
+A rejected request never reaches this codebase, so it gets Vercel's own
+429, not one of `curate.js`'s `{error, code, details}` bodies. That's fine
+on the app side without any change there: `CurationService.performRequest`
+(iOS) already treats any non-200 as a generic failure and falls back to
+on-device selection regardless of the response body shape — it doesn't
+require a parseable `ErrorBody`.
+
+**Why this isn't implemented in-function instead.** A Vercel serverless
+function is stateless between invocations — a plain in-memory counter
+resets (or is inconsistent across concurrent instances) on every cold
+start and every scale-out, so it would silently undercount and let a loop
+through while looking like it works in casual testing. Doing this
+correctly in-function would need a request counter in external storage
+that every invocation reads and increments atomically — Vercel KV or
+Upstash Redis (`INCR` + `EXPIRE` per IP), the same category of store this
+repo would need for App Attest device-key persistence (see below). Since
+the platform feature already covers the actual threat here for free, that
+storage dependency isn't worth taking on just for this.
+
 ## Testing the prompts with real photos
 
 `tools/curate-test.mjs` sends a folder of real photos through the deployed
