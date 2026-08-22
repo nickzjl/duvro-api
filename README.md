@@ -174,6 +174,47 @@ A device Apple has no record of is **not an error** — Apple answers `200` with
 plain-text `Failed to find bit state` body, which is reported as both bits
 `false` (a fresh device with its free post intact).
 
+### `POST /api/entitlement/consume`
+
+Marks the free premium post as used by setting `bit0` true.
+
+```jsonc
+// request
+{ "deviceToken": "<base64 from DCDevice.generateToken()>" }
+```
+
+```jsonc
+// 200
+{
+  "freePremiumPostAvailable": false,
+  "consumed": true,
+  "alreadyConsumed": false,  // true if it was already consumed before this call
+  "bit0": true,
+  "bit1": false,
+  "lastUpdateTime": null,
+  "environment": "production"
+}
+```
+
+**Idempotent.** Consuming an already-consumed entitlement is a `200` with the
+same resulting state, not an error — only `alreadyConsumed` differs. The bits are
+read before writing, so a repeat call costs no write, and the app can tell
+whether *this* call was the one that consumed the entitlement.
+
+`bit1` is written explicitly as `false` because Apple has no partial update — an
+update always sets both bits. On the short-circuit path (already consumed) no
+write happens at all, so an existing `bit1` is reported rather than cleared.
+
+`lastUpdateTime` is `null` on a call that performed the write, since Apple
+returns an empty body from `update_two_bits`; a later `check` reports it.
+
+⚠️ **Not atomic.** DeviceCheck offers no compare-and-swap, so two `consume`
+calls racing for the same device can both read `bit0: false` and both report
+`alreadyConsumed: false`. The final bit state is still correct, but if you need
+"exactly one free post" to be airtight against a client retrying in parallel,
+serialise consume calls app-side. In practice the app consumes once at the end
+of a post, so this is a narrow window.
+
 ### Error codes
 
 Apple replies in plain text, and its exact wording is not contractual. Responses
