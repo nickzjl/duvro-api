@@ -21,6 +21,11 @@ Zero runtime dependencies (Node's built-in `fetch`).
   drained and discarded rather than forwarded, since they can quote request content.
 - Validation errors name field **paths** (`photos[2].metrics.width`), never
   field **values**.
+- **Device tokens are device identifiers** and are treated the same way: never
+  logged, never written to disk, never echoed in a response. `APPLE_DEVICECHECK_KEY`
+  is read from the environment only and never appears in a response or an error
+  message; Apple's raw error text is mapped to our own codes rather than
+  forwarded.
 
 ## Endpoint
 
@@ -127,6 +132,142 @@ maximum** — the old 10s Hobby ceiling no longer applies. `vercel.json` sets
 returns a clean `504` JSON body instead of Vercel's HTML timeout page. If you want
 the app to give up sooner, lower `UPSTREAM_TIMEOUT_MS` in
 [api/curate.js](api/curate.js) rather than `maxDuration`.
+
+## Entitlements (DeviceCheck)
+
+duvro's premium tier gives every device **one free premium post, ever**. There
+are no accounts, so there is no user identity to hang that off — Apple's
+[DeviceCheck](https://developer.apple.com/documentation/devicecheck) provides two
+bits of per-device state that survive app deletion and reinstall.
+
+**Apple stores the bits, not us.** The app calls `DCDevice.generateToken()` and
+sends the token here; this server signs a JWT and asks Apple to read or write the
+bits. No database — that is the distinction from App Attest.
+
+| Bit | Meaning |
+| --- | --- |
+| `bit0` | This device has used its free premium post |
+| `bit1` | Reserved — always written `false` |
+
+### `POST /api/entitlement/check`
+
+Read-only. Never writes bits.
+
+```jsonc
+// request
+{ "deviceToken": "<base64 from DCDevice.generateToken()>" }
+```
+
+```jsonc
+// 200
+{
+  "freePremiumPostAvailable": true,
+  "consumed": false,
+  "bit0": false,
+  "bit1": false,
+  "lastUpdateTime": null,   // Apple returns "YYYY-MM", null if never set
+  "environment": "production"
+}
+```
+
+A device Apple has no record of is **not an error** — Apple answers `200` with a
+plain-text `Failed to find bit state` body, which is reported as both bits
+`false` (a fresh device with its free post intact).
+
+### Error codes
+
+Apple replies in plain text, and its exact wording is not contractual. Responses
+are mapped to codes the app can branch on; **Apple's raw text is never
+forwarded**.
+
+| Status | `code` | Meaning for the app |
+| --- | --- | --- |
+| `400` | `invalid_request` | Malformed JSON, or `deviceToken` missing/not base64. |
+| `400` | `invalid_device_token` | Apple rejected the token. Generate a fresh one and retry once. |
+| `400` | `device_token_already_used` | Token was already spent; generate a fresh one. |
+| `400` | `unsupported_device` | Device has no DeviceCheck support. Fall back — don't retry. |
+| `405` | `method_not_allowed` | Not `POST`. |
+| `429` | `rate_limited` | Apple is throttling. Back off and retry. |
+| `500` | `server_misconfigured` | Our key/key id/team id is wrong, or an env var is missing. Not the app's fault; retrying won't help. |
+| `502` | `apple_unavailable` | Apple is down or unreachable. Retry with backoff. |
+| `504` | `apple_timeout` | Apple didn't answer within 10s. |
+| `502` | `apple_unexpected` | Something Apple returned that we don't recognise. |
+
+### Environment variables
+
+| Variable | Value |
+| --- | --- |
+| `APPLE_DEVICECHECK_KEY` | Contents of the `.p8` private key |
+| `APPLE_DEVICECHECK_KEY_ID` | The key's 10-character Key ID |
+| `APPLE_TEAM_ID` | Your 10-character Apple Team ID |
+| `APPLE_DEVICECHECK_ENV` | `production` (default) or `development` |
+
+`APPLE_DEVICECHECK_KEY` is accepted with real newlines, with literal `\n`
+escapes, or as the whole PEM base64-encoded — whichever survives your paste into
+the Vercel dashboard.
+
+### Switching between the development and production hosts
+
+Set `APPLE_DEVICECHECK_ENV`:
+
+| Value | Host |
+| --- | --- |
+| `production` (default) | `api.devicecheck.apple.com` |
+| `development` | `api.development.devicecheck.apple.com` |
+
+```bash
+vercel env add APPLE_DEVICECHECK_ENV
+```
+
+Then redeploy — env vars are read at request time, but a redeploy is what picks
+up the new value for an existing deployment.
+
+**A token minted by a development build only validates against the development
+host, and vice versa.** Get it wrong and Apple rejects the token, which surfaces
+as `invalid_device_token`.
+
+⚠️ **The two hosts keep entirely separate bit storage.** A device that consumed
+its free post against the development host still reads `bit0: false` on
+production. Don't treat development results as a preview of production state —
+and don't flip a live deployment to `development` to debug, or every user's
+entitlement silently resets. The environment used is echoed in every response as
+`environment` so a misconfiguration is visible rather than silent.
+
+Default is `production` deliberately: a missing or misspelled env var should not
+quietly point live traffic at the development bit store.
+
+### Rotating the DeviceCheck key
+
+1. In the Apple Developer portal → **Certificates, Identifiers & Profiles → Keys**,
+   create a new key with **DeviceCheck** enabled. Download the `.p8` — Apple
+   allows this **once**, so store it in a password manager immediately.
+2. Update both variables together, in this order:
+   ```bash
+   vercel env rm APPLE_DEVICECHECK_KEY production
+   vercel env add APPLE_DEVICECHECK_KEY production      # paste the new .p8 contents
+   vercel env rm APPLE_DEVICECHECK_KEY_ID production
+   vercel env add APPLE_DEVICECHECK_KEY_ID production   # the new Key ID
+   ```
+   The key and its Key ID are a **pair** — a new key with a stale `KEY_ID` fails
+   Apple's auth with `server_misconfigured`.
+3. Redeploy, then verify with a real device before revoking the old key.
+4. Revoke the old key in the portal.
+
+`APPLE_TEAM_ID` does not change on rotation. Signing JWTs are cached in memory
+for 30 minutes per warm instance, keyed on key id + team id + environment, so a
+rotation takes effect on new instances immediately and on warm ones within half
+an hour — force it sooner by redeploying.
+
+**The bits are unaffected by rotation.** They live with Apple, keyed to the
+device and your team — not to the signing key.
+
+### DeviceCheck does not work in the Simulator
+
+`DCDevice.isSupported` is `false` in the iOS Simulator and
+`generateToken()` fails there. **All real testing has to be on a physical
+device.** The server has no way to distinguish a Simulator from a hardware
+device — it only ever sees the token — so a Simulator build simply cannot reach
+these endpoints with anything Apple will accept.
 
 ## Prompts
 
