@@ -1,0 +1,42 @@
+TODO(style-instruction): golden_hour / Soft Glow
+
+PLACEHOLDER — not a usable instruction yet.
+
+No image model has been chosen, and instruction phrasing is model-specific
+(some want terse tag lists, some want prose, some want a strict edit verb),
+so writing one now would mean rewriting it later. What this file does instead
+is pin down the TARGET LOOK precisely, so whoever writes the real instruction
+is translating a known aesthetic rather than reinventing it.
+
+Replace everything below the ---- line with the real instruction. Keep the
+TODO(style-instruction) marker on line 1 until you do: /api/premium/generate
+reports placeholder instructions in DEBUG, so a wrong-looking render is never
+mistaken for an instruction nobody wrote.
+
+THE LOOK
+The diffused one. Near-neutral temperature, desaturated, and dominated by a
+large highlight-concentrated glow — the heaviest bloom in the pack by a wide
+margin — with the finest grain. Hazy and luminous. IMPORTANT: the glow must
+stay concentrated in the highlights; an even white wash over the whole frame
+is the specific failure this variant has already had once (see the pack's
+tuning notes), and it is what the shadows staying properly dark prevents.
+
+WHAT BASIC TIER DOES
+The deterministic Core Image chain below is the same aesthetic, and premium
+must read as that look executed better — not as a different look. These are
+the app's own tuned values (duvro/Packs/golden_hour.json), hand-graded against
+reference images. Op order is
+temperatureTint -> colorControls -> vibrance -> toneCurve -> vignette ->
+bloom -> grain. Baseline temperature is 6500K, so a lower number is warmer.
+
+temperatureTint  temperature 6030, tint -28   (closest to neutral 6500K)
+colorControls    saturation 0.93, brightness 0.0, contrast 0.98
+vibrance         0.05
+vignette         intensity 0.05, radius 1.6
+bloom            radius 76.8, intensity 0.24   (largest bloom in the pack)
+grain            intensity 0.01, size 0.8
+
+----
+Apply the look described above to this photograph. Preserve the subject,
+composition, framing, and all facial features exactly; change only colour,
+tone, and grain.

@@ -1,0 +1,41 @@
+TODO(style-instruction): digicam / Light Leak
+
+PLACEHOLDER — not a usable instruction yet.
+
+No image model has been chosen, and instruction phrasing is model-specific
+(some want terse tag lists, some want prose, some want a strict edit verb),
+so writing one now would mean rewriting it later. What this file does instead
+is pin down the TARGET LOOK precisely, so whoever writes the real instruction
+is translating a known aesthetic rather than reinventing it.
+
+Replace everything below the ---- line with the real instruction. Keep the
+TODO(style-instruction) marker on line 1 until you do: /api/premium/generate
+reports placeholder instructions in DEBUG, so a wrong-looking render is never
+mistaken for an instruction nobody wrote.
+
+THE LOOK
+Warm, saturated and punchy, with a red-orange light leak bleeding in from ONE
+corner (top-trailing) and heavy grain. Reads like a film compact that fogged a
+frame. The leak is corner-localised — a 25-35% falloff, peaking around 30-40%
+intensity — not a wash across the whole image.
+
+WHAT BASIC TIER DOES
+The deterministic Core Image chain below is the same aesthetic, and premium
+must read as that look executed better — not as a different look. These are
+the app's own tuned values (duvro/Packs/digicam.json), hand-graded against
+reference images. Op order is
+temperatureTint -> colorControls -> vibrance -> toneCurve -> vignette ->
+bloom -> grain. Baseline temperature is 6500K, so a lower number is warmer.
+
+temperatureTint  temperature 5439, tint -36   (warmest in this pack)
+colorControls    saturation 1.08, brightness 0.0, contrast 1.0
+vibrance         0.10
+vignette         intensity 0.07, radius 1.3
+bloom            radius 44.8, intensity 0.11
+lightLeak        intensity 0.35, corner topTrailing, red-orange
+grain            intensity 0.26, size 1.1   (heavy)
+
+----
+Apply the look described above to this photograph. Preserve the subject,
+composition, framing, and all facial features exactly; change only colour,
+tone, and grain.

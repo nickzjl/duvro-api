@@ -1,0 +1,44 @@
+TODO(style-instruction): digicam / Y2K Digicam
+
+PLACEHOLDER — not a usable instruction yet.
+
+No image model has been chosen, and instruction phrasing is model-specific
+(some want terse tag lists, some want prose, some want a strict edit verb),
+so writing one now would mean rewriting it later. What this file does instead
+is pin down the TARGET LOOK precisely, so whoever writes the real instruction
+is translating a known aesthetic rather than reinventing it.
+
+Replace everything below the ---- line with the real instruction. Keep the
+TODO(style-instruction) marker on line 1 until you do: /api/premium/generate
+reports placeholder instructions in DEBUG, so a wrong-looking render is never
+mistaken for an instruction nobody wrote.
+
+THE LOOK
+Early-2000s point-and-shoot with the flash on: the coolest, most saturated and
+most vibrant variant in the app, with both the heaviest bloom and the heaviest
+grain, plus a small yellow date stamp in the bottom-right corner. Harsh and
+nostalgic, deliberately over-processed. NOTE the date stamp is a composite
+overlay of the photo's own capture date, not invented text — if the provider
+cannot place accurate text, generate the graded image only and let the app
+stamp it.
+
+WHAT BASIC TIER DOES
+The deterministic Core Image chain below is the same aesthetic, and premium
+must read as that look executed better — not as a different look. These are
+the app's own tuned values (duvro/Packs/digicam.json), hand-graded against
+reference images. Op order is
+temperatureTint -> colorControls -> vibrance -> toneCurve -> vignette ->
+bloom -> grain. Baseline temperature is 6500K, so a lower number is warmer.
+
+temperatureTint  temperature 8275, tint -20   (coolest in the app)
+colorControls    saturation 1.08, brightness 0.0, contrast 1.0
+vibrance         0.19
+vignette         intensity 0.12, radius 1.2
+bloom            radius 102.4, intensity 0.26   (largest bloom in the app)
+grain            intensity 0.32, size 0.8       (heaviest grain in the app)
+dateStamp        bottom-trailing, scale 0.035, yellow digital numerals
+
+----
+Apply the look described above to this photograph. Preserve the subject,
+composition, framing, and all facial features exactly; change only colour,
+tone, and grain.

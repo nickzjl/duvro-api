@@ -1,0 +1,39 @@
+TODO(style-instruction): travel_film / Kodak Style
+
+PLACEHOLDER — not a usable instruction yet.
+
+No image model has been chosen, and instruction phrasing is model-specific
+(some want terse tag lists, some want prose, some want a strict edit verb),
+so writing one now would mean rewriting it later. What this file does instead
+is pin down the TARGET LOOK precisely, so whoever writes the real instruction
+is translating a known aesthetic rather than reinventing it.
+
+Replace everything below the ---- line with the real instruction. Keep the
+TODO(style-instruction) marker on line 1 until you do: /api/premium/generate
+reports placeholder instructions in DEBUG, so a wrong-looking render is never
+mistaken for an instruction nobody wrote.
+
+THE LOOK
+Classic warm colour-negative film: warm, the most saturated variant in its
+pack, with lifted vibrance and moderate grain. Rich and slightly nostalgic
+without being faded — the opposite end of this pack from Faded Postcard.
+
+WHAT BASIC TIER DOES
+The deterministic Core Image chain below is the same aesthetic, and premium
+must read as that look executed better — not as a different look. These are
+the app's own tuned values (duvro/Packs/travel_film.json), hand-graded against
+reference images. Op order is
+temperatureTint -> colorControls -> vibrance -> toneCurve -> vignette ->
+bloom -> grain. Baseline temperature is 6500K, so a lower number is warmer.
+
+temperatureTint  temperature 5352, tint -20   (warmest in this pack)
+colorControls    saturation 1.12, brightness 0.0, contrast 1.0
+vibrance         0.20
+vignette         intensity 0.07, radius 1.4
+bloom            radius 47.36, intensity 0.15
+grain            intensity 0.20, size 1.2
+
+----
+Apply the look described above to this photograph. Preserve the subject,
+composition, framing, and all facial features exactly; change only colour,
+tone, and grain.
