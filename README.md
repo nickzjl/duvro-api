@@ -1,12 +1,19 @@
 # duvro-api
 
-Server-side curation endpoint for duvro (iOS). Separate repo from the app.
+Server-side endpoints for duvro (iOS). Separate repo from the app.
 
-`POST /api/curate` takes a batch of camera-roll photos, sends them to Claude with
-the system prompt for the requested aesthetic and tier, and returns the model's
-carousel selection, alternates, and captions.
+- **`POST /api/curate`** takes a batch of camera-roll photos, sends them to
+  Claude with the system prompt for the requested aesthetic and tier, and
+  returns the model's carousel selection, alternates, and captions.
+- **`POST /api/entitlement/check` / `/consume`** read and set the device's one
+  free premium post, via Apple DeviceCheck.
+- **`POST /api/premium/generate`** runs the premium tier's image generation —
+  three generated variants per photo, streamed back as they complete. **No
+  image model is chosen yet**; the generation call sits behind a swappable
+  interface whose only implementation is a stub.
 
-Zero runtime dependencies (Node's built-in `fetch`).
+Zero runtime dependencies (Node's built-in `fetch`). Tests use Node's built-in
+runner: `npm test`.
 
 ## Privacy invariants
 
@@ -26,6 +33,13 @@ Zero runtime dependencies (Node's built-in `fetch`).
   is read from the environment only and never appears in a response or an error
   message; Apple's raw error text is mapped to our own codes rather than
   forwarded.
+- **Photo image data and image URLs never touch a log or the disk.** The premium
+  endpoint logs one cost line per batch containing only numeric counters
+  (provider name, photos, slots, attempted, retried, generated, fell back, and
+  the fallback-reason tally) — no ids, no URLs, no image bytes. A provider's raw
+  error message is discarded rather than surfaced, since it can quote request
+  content. There is a test asserting neither an image URL nor a device token can
+  appear in that line.
 
 ## Endpoint
 
@@ -310,6 +324,216 @@ device.** The server has no way to distinguish a Simulator from a hardware
 device — it only ever sees the token — so a Simulator build simply cannot reach
 these endpoints with anything Apple will accept.
 
+## Premium tier
+
+Basic renders three variants per photo locally with Core Image — 8–17ms each,
+free and deterministic. Premium replaces those three local renders with three
+generated ones, so a 7-photo post is **21 generations**. The app then picks
+between them in the existing three-way edit screen, unchanged.
+
+**No image model has been chosen.** Everything here is built around the
+generation call; the call itself sits behind
+[lib/imageProvider.js](lib/imageProvider.js) and the only implementation is a
+stub that returns its input unchanged. The whole pipeline runs end to end on
+the stub, which is how it was tested.
+
+### `POST /api/premium/generate`
+
+**Request**
+
+```jsonc
+{
+  "deviceToken": "base64",       // Apple DeviceCheck token — same as /api/entitlement/*
+  "vibePack": "golden_hour",     // golden_hour | digicam | travel_film
+  "photos": [
+    {
+      "id": "p1",                // unique within the request; echoed on every slot
+      "url": "https://…",        // https, full-resolution, publicly fetchable
+      "mediaType": "image/jpeg"  // optional
+    }
+  ]
+}
+```
+
+At most **10 photos** (30 generations) per request — the same carousel ceiling
+`/api/curate` enforces.
+
+**Photos are sent as URLs, not bytes.** Vercel caps a function's request *and*
+response body at **4.5 MB**. One full-resolution photo can approach that on its
+own, seven cannot fit, and 21 generated ones exceed it by an order of
+magnitude — so inline base64 is not an option in either direction, at any
+quality setting. See "The open decision" below, because this is the one piece
+of the design that is not finished.
+
+**Response: an NDJSON stream**, `application/x-ndjson`. One JSON object per
+line, written as work completes:
+
+```jsonc
+{"type":"start","totalSlots":21,"photos":7,"variantsPerPhoto":3,"concurrency":3,"provider":"stub","placeholderInstructions":3}
+{"type":"slot","photoId":"p1","variant":"Sun-kissed","variantIndex":0,"status":"generated","url":"https://…","mediaType":"image/jpeg","attempts":1,"completed":1,"totalSlots":21}
+{"type":"slot","photoId":"p1","variant":"Warm Film","variantIndex":1,"status":"fallback","fallbackReason":"provider_timeout","attempts":2,"completed":2,"totalSlots":21}
+…
+{"type":"done","counts":{…}}
+{"type":"complete","counts":{…},"slots":[ …every slot again… ]}
+```
+
+- **`slot`** — one per (photo, variant). `status` is `generated` (use `url`) or
+  `fallback` (**render this variant locally with Core Image, exactly as on the
+  free tier**). `completed`/`totalSlots` drive the progress bar.
+- **`complete`** — the terminal line, repeating every slot. A client that
+  ignored the incremental events still has the full result from this one
+  object, so the stream is an optimisation for perceived speed, not a
+  protocol you are forced to track statefully.
+- Slots arrive **photo-major** — all three variants of photo 1, then photo 2 —
+  so the edit screen can open on photo 1 without waiting for the batch.
+
+`fallbackReason` is one of `provider_timeout`, `provider_error`,
+`batch_deadline` (the batch ran out of time before this slot started), or
+`cancelled`.
+
+**Pre-stream errors** are ordinary JSON with a real status code, because
+nothing has been written yet:
+
+| Status | `code` | When |
+| --- | --- | --- |
+| `400` | `invalid_request` | Bad JSON, unknown pack, over the cap, bad image URL |
+| `402` | `entitlement_required` | The device's free premium post is already spent |
+| `405` | `method_not_allowed` | Not `POST` |
+| `500` | `server_misconfigured` | Apple or provider env vars missing/invalid |
+| `502`/`504` | (DeviceCheck codes) | Apple unreachable — see Error codes above |
+
+Once the stream opens the status is committed to `200`; a structural failure
+after that point arrives as a `{"type":"error"}` line instead.
+
+### Why streaming, and not polling
+
+Polling is the obvious alternative and it does not fit here. A Vercel function
+is **stateless between invocations** and cannot reliably keep working after it
+responds, so a job-id + poll design needs external storage (Redis/KV) to hold
+job state *and* something to run the work — two new dependencies for a repo
+that currently has zero, to solve a problem that fits in one invocation.
+
+Streaming needs none of that: one invocation does the work and reports as it
+goes. The cost is that the whole batch must fit inside `maxDuration`, which is
+**300s and not extendable on Hobby** — and the batch is built around that
+ceiling rather than hoping to stay under it (see the deadline behaviour below).
+
+Verified over real HTTP with the stub at 120ms latency and concurrency 3: nine
+slot lines arrived in three groups at 138ms/260ms/384ms, not together at the
+end. **Not yet verified on a real deployment** — whether Vercel's edge buffers
+the response is the one thing that can only be checked by deploying, and this
+is the first thing to confirm when you do. If it turns out buffered, the
+`complete` line means the app still works correctly; it just loses live
+progress.
+
+### What the app needs to do
+
+1. `POST /api/entitlement/check` (existing) to know whether premium is offered.
+2. Upload the chosen full-resolution photos somewhere https-fetchable and
+   collect their URLs. **This step does not exist yet** — see below.
+3. `POST /api/premium/generate` and read the response line by line
+   (`URLSession.bytes(for:)`, split on `\n`, decode each line).
+4. Drive the progress UI from `completed`/`totalSlots`.
+5. For each `slot`: `generated` → download `url`; `fallback` → render that one
+   variant locally with the existing Core Image chain. A post can legitimately
+   mix the two, per-variant, and the user should not be able to tell.
+6. `POST /api/entitlement/consume` (existing) when the post is actually
+   committed.
+
+**Preview must be a downsample of the exact image that exports.** Generation is
+non-deterministic, so generating a small preview and regenerating at full
+resolution for export would hand the user something they never approved —
+breaking Phase 6's preview-matches-export-1:1 guarantee. Everything server-side
+is full-resolution for this reason; the app downsamples for display and exports
+that same asset.
+
+### The open decision: where the images live
+
+The endpoint takes URLs in and hands URLs back, and with the stub that closes
+cleanly because the stub returns its input. **A real provider will not.** Two
+gaps remain, both genuinely blocked on the provider choice rather than on
+effort:
+
+- **Upload.** The app has to get full-resolution photos to an https URL before
+  calling this. Vercel Blob's client-upload flow is the natural fit (it uploads
+  straight to storage, bypassing the 4.5 MB function limit), but it is a new
+  dependency and this repo has none.
+- **Output.** If the chosen provider returns a **URL**, it passes straight
+  through and nothing more is needed. If it returns **bytes**, they need
+  somewhere to go — the same blob store — because they cannot be inlined in the
+  response. `lib/imageProvider.js` already allows either shape
+  (`{ url }` or `{ bytes }`); only the storing half is unbuilt.
+
+Pick the provider first: "does it return a URL or bytes" decides whether the
+second gap exists at all.
+
+### Configuration
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `IMAGE_PROVIDER` | `stub` | Which implementation to use. Swapping providers is a config change. |
+| `IMAGE_PROVIDER_CONCURRENCY` | `3` | Max simultaneous generations. **Set this to the provider's real cap.** |
+| `IMAGE_PROVIDER_TIMEOUT_MS` | `90000` | Per-call ceiling. Enforced by racing, so it holds even if a provider ignores its abort signal. |
+| `PREMIUM_ALLOWED_IMAGE_HOSTS` | unset | Optional comma-separated host allowlist for photo URLs. |
+| `IMAGE_PROVIDER_STUB_DELAY_MS` | `0` | Stub only — fake latency, for watching progress pacing. |
+| `IMAGE_PROVIDER_STUB_FAIL_RATE` | `0` | Stub only — 0–1, forces the retry/fallback path. |
+
+### If the provider's concurrency cap is very low
+
+**This is the design's main sensitivity, and it degrades rather than breaks.**
+The batch carries its own deadline (300s minus a 20s margin for writing the
+response) and stops *starting* generations once too little time remains; those
+slots return `fallbackReason: "batch_deadline"` and the app renders them
+locally. So a low cap never produces a failed request or a killed function — it
+produces a post with more locally-rendered variants in it.
+
+The arithmetic for 21 generations, assuming ~15s each:
+
+| Concurrency | Wall clock | Fits in 280s? |
+| --- | --- | --- |
+| 5 | ~63s | yes, comfortably |
+| 3 | ~105s | yes |
+| 2 | ~158s | yes |
+| 1 | ~315s | **no** — roughly the last third falls back |
+
+At ~30s per generation, concurrency 2 is already marginal and 1 fails most of
+the batch. Two mitigations exist if a real provider lands there, neither built:
+
+- **Split the batch across requests** — the app calls the endpoint once per
+  photo (3 generations) instead of once per post. Each call gets its own fresh
+  300s, which removes the ceiling as a constraint entirely. This is the real
+  fix, it is a small change to this endpoint, and it is worth doing the moment
+  measured latency × 21 ÷ concurrency approaches 280s. It costs more
+  invocations and a little more app-side orchestration.
+- **Generate fewer than three variants per photo** — a product change, not a
+  technical one, and it weakens the three-way edit screen that is the app's
+  signature interaction. Mentioned for completeness; not recommended.
+
+One thing that is *not* a mitigation: raising `IMAGE_PROVIDER_CONCURRENCY`
+above the provider's real cap. That converts a slow batch into a rate-limited
+one, and rate-limit errors consume the retry and land in fallback anyway.
+
+### Known gap: an entitled device can call this repeatedly
+
+Verification is read-only — it checks the device's DeviceCheck bit but does not
+set it, so consuming stays the app's explicit separate call and an abandoned or
+failed batch does not silently burn the user's one free post. The cost is that
+a device with an unspent entitlement can call `generate` as often as it likes,
+and each call is real money.
+
+Three options, none implemented, in rough order of preference:
+
+1. **Consume first, refund on total failure** — set the bit before generating,
+   clear it if every slot fell back. Closes the hole; needs a defensible
+   definition of "failed enough to refund".
+2. **A short server-side cooldown per device** — needs the same external store
+   as everything else in this file.
+3. **A WAF rate limit on this path specifically** — see "Rate limiting" above.
+   Cheapest, and bounds the blast radius without closing the hole.
+
+The daily spend cap bounds the worst case in dollars today, as it does for
+`/api/curate`.
+
 ## Prompts
 
 Six plain-text files in [prompts/](prompts), loaded by `<vibePack>.<tier>.txt` and
@@ -327,6 +551,36 @@ deployment.
 
 The carousel range was changed from 4–20 to 4–10 in all six, including the worked
 examples that referenced counts above 10. Everything else is verbatim.
+
+### Style instructions (premium)
+
+Nine more plain-text files in [prompts/styles/](prompts/styles), one per
+(pack, variant), loaded by [lib/styles.js](lib/styles.js) exactly the way the
+six above are loaded — `<vibePack>.<variant-slug>.txt`, read once per warm
+instance and cached.
+
+```
+golden_hour.sun-kissed.txt   digicam.light-leak.txt    travel_film.kodak-style.txt
+golden_hour.warm-film.txt    digicam.polaroid.txt      travel_film.faded-postcard.txt
+golden_hour.soft-glow.txt    digicam.y2k-digicam.txt   travel_film.deep-teal.txt
+```
+
+**All nine are placeholders.** Instruction phrasing is model-specific and no
+model is chosen, so each file instead pins down what the real instruction has
+to reproduce: the look in plain terms, the failure modes already known from
+tuning the basic tier, and that variant's own hand-graded Core Image values
+from the app's pack JSON — premium must read as the same aesthetic executed
+better, not as a different look.
+
+Each carries a `TODO(style-instruction)` marker on line 1. The endpoint counts
+them and reports the number in its `start` event
+(`placeholderInstructions`), so a wrong-looking render is never mistaken for an
+instruction nobody wrote. Remove the marker when you write the real one.
+
+The variant **display names** are the wire format, taken verbatim from the
+app's `duvro/Packs/*.json` — there is no second identifier to keep in sync.
+Slugs exist only as filenames. Matching is case- and whitespace-insensitive,
+but pairing a variant with the wrong pack is an error, not a near-miss.
 
 ### Prompt caching
 
