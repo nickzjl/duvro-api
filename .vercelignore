@@ -3,3 +3,6 @@ tools/
 
 # Local photo folders used with tools/curate-test.mjs
 test-photos/
+
+# Tests — dev-only, must never reach the deployed function.
+test/
