@@ -4,6 +4,10 @@
     "api/curate.js": {
       "maxDuration": 300,
       "includeFiles": "prompts/**"
+    },
+    "api/premium/generate.js": {
+      "maxDuration": 300,
+      "includeFiles": "prompts/styles/**"
     }
   }
 }
