@@ -337,6 +337,101 @@ generation call; the call itself sits behind
 stub that returns its input unchanged. The whole pipeline runs end to end on
 the stub, which is how it was tested.
 
+### Getting photos to fal: `POST /api/premium/upload-targets`
+
+Photos reach the generator by being uploaded **directly from the app to fal's
+CDN**. They never pass through this server, and `FAL_KEY` never reaches the app.
+
+```
+app  ──▶ POST /api/premium/upload-targets      "7 photos, image/jpeg"
+here ──▶ fal  POST /storage/upload/initiate    ×7, with FAL_KEY
+here ──▶ app  [{ uploadUrl, fileUrl }, …]
+app  ──▶ fal  PUT bytes to each uploadUrl      no key involved
+app  ──▶ POST /api/premium/generate            with the fileUrls
+```
+
+Both halves are forced, not chosen. Vercel caps a function's request *and*
+response body at **4.5 MB**, so bytes cannot transit this server; and an IPA is
+trivially unpacked, so the key cannot ship in the app.
+
+**Request**
+
+```jsonc
+{
+  "deviceToken": "base64",              // Apple DeviceCheck token
+  "files": [
+    { "contentType": "image/jpeg", "fileName": "IMG_0042.HEIC" }  // fileName optional
+  ]
+}
+```
+
+`contentType` must be one of `image/jpeg`, `image/png`, `image/heic`,
+`image/heif`, `image/webp`. At most **10** files — the same ceiling
+`/api/premium/generate` enforces. `fileName` is sanitised to a safe stem plus an
+extension derived from `contentType`; it reaches a third party, so it is never
+passed through raw.
+
+**Response**
+
+```jsonc
+{
+  "targets": [
+    {
+      "uploadUrl": "https://…",          // PUT the bytes here
+      "fileUrl": "https://v3.fal.media/files/…",  // send THIS to /api/premium/generate
+      "method": "PUT",
+      "headers": { "Content-Type": "image/jpeg" },
+      "contentType": "image/jpeg"
+    }
+  ],
+  "expiresInSeconds": null,              // fal documents no validity window — upload promptly
+  "objectExpirySeconds": 86400
+}
+```
+
+The app uploads with a plain `PUT` — no `Authorization` header, no fal
+credentials:
+
+```
+PUT <uploadUrl>
+Content-Type: image/jpeg
+<raw bytes>
+```
+
+**Why it needs a device token.** An open endpoint minting upload URLs against
+our paid fal account is free file hosting for whoever finds it. The token is
+verified with Apple, so forged tokens get nothing. The entitlement **bit is
+deliberately not checked** — uploading happens before generation, and a future
+paying user will already have `bit0` set. This proves "a real Apple device
+asked", not "this device is entitled"; entitlement stays enforced at
+`/api/premium/generate`.
+
+**Uploaded photos and generated images expire.** fal's default is to keep
+objects forever, which sits badly with a product whose pitch is that nothing is
+retained. Every upload carries `X-Fal-Object-Lifecycle` and every generation
+carries `X-Fal-Object-Lifecycle-Preference` (fal uses two different header names
+for the two cases), both set from `FAL_OBJECT_EXPIRY_SECONDS`, default **24h**.
+Set it to `0` to opt out. **The app must download generated images before they
+expire** — expired objects are permanently deleted.
+
+> ⚠️ **`/storage/upload/initiate` is not in fal's published REST docs.** It is
+> what fal's own official client calls — the contract here is transcribed from
+> `@fal-ai/client` v1.10.1 `src/storage.js`, not guessed — but fal makes no
+> stability promise for it, and their own source comments that v3 storage is
+> being tested "without making it the default at the API level". `FAL_REST_HOST`
+> and `FAL_STORAGE_TYPE` are therefore env-overridable, so a fal-side change is a
+> config edit rather than a redeploy. See "The upload endpoint choice" below.
+
+### The upload endpoint choice
+
+You asked me to check both candidates. Only one of them can work:
+
+| Candidate | Verdict |
+| --- | --- |
+| `POST /v1/serverless/files/file/local/{target_path}` (multipart) | **Unusable.** Documented, stable — and requires `Authorization: Key …` from *whoever uploads*. Using it means either shipping the key in the app or routing bytes through this server, and both are exactly what the architecture exists to avoid. |
+| `POST /storage/upload/initiate` (signed URL) | **Used.** Returns a signed `upload_url` the app can `PUT` to with no credentials. Undocumented, but it is what fal's own SDK uses. |
+| `POST /v1/storage/files/sign` | Not applicable — signs for **read** access to an existing file, not for upload. |
+
 ### `POST /api/premium/generate`
 
 **Request**
