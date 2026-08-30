@@ -115,9 +115,12 @@ test('calls fal with the contract read from @fal-ai/client', async () => {
 test('sets the upload object-lifecycle header so photos expire off fal', async () => {
   const h = harness();
   await call({ deviceToken: TOKEN, files: files(1) });
-  const hdr = h.falCalls()[0].init.headers['x-fal-object-lifecycle'];
-  assert.ok(hdr, 'lifecycle header must be present by default');
-  assert.equal(JSON.parse(hdr).expiration_duration_seconds, 86400);
+  // fal's docs and fal's own SDK disagree on the name here, so we send both.
+  const headers = h.falCalls()[0].init.headers;
+  for (const name of ['x-fal-object-lifecycle', 'x-fal-object-lifecycle-preference']) {
+    assert.ok(headers[name], `${name} must be present by default`);
+    assert.equal(JSON.parse(headers[name]).expiration_duration_seconds, 86400);
+  }
 });
 
 test('FAL_OBJECT_EXPIRY_SECONDS=0 opts out of expiry', async () => {
@@ -125,6 +128,7 @@ test('FAL_OBJECT_EXPIRY_SECONDS=0 opts out of expiry', async () => {
   await call({ deviceToken: TOKEN, files: files(1) },
     { env: { ...BASE_ENV, FAL_OBJECT_EXPIRY_SECONDS: '0' } });
   assert.equal(h.falCalls()[0].init.headers['x-fal-object-lifecycle'], undefined);
+  assert.equal(h.falCalls()[0].init.headers['x-fal-object-lifecycle-preference'], undefined);
 });
 
 test('FAL_KEY never appears in the response body', async () => {
