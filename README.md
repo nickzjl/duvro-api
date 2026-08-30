@@ -7,10 +7,12 @@ Server-side endpoints for duvro (iOS). Separate repo from the app.
   returns the model's carousel selection, alternates, and captions.
 - **`POST /api/entitlement/check` / `/consume`** read and set the device's one
   free premium post, via Apple DeviceCheck.
+- **`POST /api/premium/upload-targets`** mints signed fal CDN upload URLs so the
+  app can send photos straight to fal — bytes never transit this server.
 - **`POST /api/premium/generate`** runs the premium tier's image generation —
-  three generated variants per photo, streamed back as they complete. **No
-  image model is chosen yet**; the generation call sits behind a swappable
-  interface whose only implementation is a stub.
+  three generated variants per photo, streamed back as they complete, via
+  **fal-ai/flux-pro/kontext**. Provider selection is env-driven and a
+  no-spend `stub` remains available.
 
 Zero runtime dependencies (Node's built-in `fetch`). Tests use Node's built-in
 runner: `npm test`.
@@ -331,11 +333,10 @@ free and deterministic. Premium replaces those three local renders with three
 generated ones, so a 7-photo post is **21 generations**. The app then picks
 between them in the existing three-way edit screen, unchanged.
 
-**No image model has been chosen.** Everything here is built around the
-generation call; the call itself sits behind
-[lib/imageProvider.js](lib/imageProvider.js) and the only implementation is a
-stub that returns its input unchanged. The whole pipeline runs end to end on
-the stub, which is how it was tested.
+The generator is **fal-ai/flux-pro/kontext**, behind
+[lib/imageProvider.js](lib/imageProvider.js). `IMAGE_PROVIDER` selects it;
+the default is `stub`, which returns its input unchanged and needs no
+credentials, so the whole pipeline stays runnable without spending.
 
 ### The generation provider
 
@@ -590,6 +591,34 @@ nothing has been written yet:
 Once the stream opens the status is committed to `200`; a structural failure
 after that point arrives as a `{"type":"error"}` line instead.
 
+### What a batch costs
+
+**$0.04 per generation** (fal's published price for flux-pro/kontext).
+
+| Post | Generations | Cost |
+| --- | --- | --- |
+| 7 photos (typical) | 21 | **$0.84** |
+| 10 photos (the cap) | 30 | **$1.20** |
+
+`MAX_PHOTOS = 10` in [api/premium/generate.js](api/premium/generate.js) is
+therefore a spend ceiling, not just a sanity check. It is enforced **before**
+the DeviceCheck round trip and long before any fal call — a request over the cap
+costs nothing at all, not even an Apple call. Tests assert that ordering
+explicitly, including that a spent entitlement and a missing `FAL_KEY` both
+produce zero fal calls.
+
+Two things keep spend bounded once generation starts: a failed slot is retried
+**once** and then falls back to the app's local render, and a provider that
+reports a failure as non-retryable (`content_policy_violation`, a `422`) is
+believed rather than retried. Cancelling — the client hangs up, or the batch
+deadline hits — sends `PUT {cancel_url}` so fal stops working on a result
+nobody will collect.
+
+Each batch logs one line of **numeric counters only** — provider, photos,
+slots, attempted, retried, generated, fell back, and the fallback-reason tally.
+No ids, no URLs, no image data. There is a test asserting an image URL and a
+device token cannot appear in it.
+
 ### Why streaming, and not polling
 
 Polling is the obvious alternative and it does not fit here. A Vercel function
@@ -614,8 +643,8 @@ progress.
 ### What the app needs to do
 
 1. `POST /api/entitlement/check` (existing) to know whether premium is offered.
-2. Upload the chosen full-resolution photos somewhere https-fetchable and
-   collect their URLs. **This step does not exist yet** — see below.
+2. `POST /api/premium/upload-targets` for one signed target per photo, `PUT`
+   each photo's bytes to its `uploadUrl`, and keep the matching `fileUrl`.
 3. `POST /api/premium/generate` and read the response line by line
    (`URLSession.bytes(for:)`, split on `\n`, decode each line).
 4. Drive the progress UI from `completed`/`totalSlots`.

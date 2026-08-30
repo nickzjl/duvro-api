@@ -34,7 +34,7 @@ import {
 } from '../../lib/devicecheck.js';
 import { PACK_VARIANTS, canonicalVariant } from '../../lib/styles.js';
 import { runBatch } from '../../lib/premiumBatch.js';
-import { ProviderConfigError, getProviderConfig } from '../../lib/imageProvider.js';
+import { ProviderConfigError, getProviderConfig, validateProviderCredentials } from '../../lib/imageProvider.js';
 
 /**
  * Hard caps, so a malformed or hostile request cannot fire hundreds of
@@ -79,6 +79,10 @@ export default async function handler(req, res) {
   let providerConfig;
   try {
     providerConfig = getProviderConfig();
+    // Includes the provider's own credentials. A missing FAL_KEY must be a 500
+    // here, not 30 fallbacks discovered one slot at a time after the stream
+    // has already committed the response to 200.
+    validateProviderCredentials();
   } catch (err) {
     if (err instanceof ProviderConfigError) {
       return send(res, 500, {
