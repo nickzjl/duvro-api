@@ -6,3 +6,4 @@ test-photos/
 
 # Tests — dev-only, must never reach the deployed function.
 test/
+kontext-out/
