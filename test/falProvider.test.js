@@ -155,11 +155,7 @@ test('uses the absolute URLs fal returns rather than rebuilding paths', async ()
   assert.ok(h.calls.some((c) => c.url === 'https://queue.fal.run/fal-ai/flux-pro/kontext/requests/req-1/response'));
 });
 
-test('falls back to documented paths when fal omits the URLs', async () => {
-  const h = falStub({ submitBody: { request_id: 'req-9' } });
-  await run();
-  assert.ok(h.calls.some((c) => c.url.endsWith('/requests/req-9/status')));
-});
+
 
 /* ---------------- failure handling ---------------- */
 
@@ -235,7 +231,12 @@ test('a transient failed poll does not fail the generation', async () => {
   globalThis.fetch = async (url, init = {}) => {
     const u = String(url);
     const reply = (s, b) => ({ ok: s < 300, status: s, headers: new Headers(), text: async () => JSON.stringify(b) });
-    if (init.method === 'POST' && !u.includes('/requests/')) return reply(200, { request_id: 'r' });
+    if (init.method === 'POST' && !u.includes('/requests/')) return reply(200, {
+      request_id: 'r',
+      // note the dropped sub-path — this is the real shape fal returns
+      status_url: 'https://queue.fal.run/fal-ai/flux-pro/requests/r/status',
+      response_url: 'https://queue.fal.run/fal-ai/flux-pro/requests/r',
+    });
     if (u.endsWith('/status')) {
       n += 1;
       if (n === 1) throw new TypeError('network blip');
@@ -274,4 +275,26 @@ test('the shared generate() timeout still bounds a stuck fal call', async () => 
       timeoutMs: 60, env: { ...ENV, IMAGE_PROVIDER: 'fal' },
     }),
     (err) => { assert.equal(err.code, 'provider_timeout'); return true; });
+});
+
+/* ---------------- regressions found against the live API ---------------- */
+
+test('missing status_url/response_url fails loudly instead of guessing a path', async () => {
+  // Live fal returns queue.fal.run/fal-ai/flux-PRO/requests/{id} for a submit to
+  // fal-ai/flux-pro/KONTEXT — the sub-path is dropped. Reconstructing the URL
+  // would 404, and the poll loop treats 404 as "not visible yet", so a wrong
+  // guess spins until the deadline instead of erroring.
+  falStub({ submitBody: { request_id: 'req-9' } });
+  await assert.rejects(run(), (err) => {
+    assert.equal(err.code, 'fal_unexpected_response');
+    assert.equal(err.retryable, false);
+    return true;
+  });
+});
+
+test('mediaType comes from the requested output_format, not fal\'s content_type', async () => {
+  // Live fal returns "content_type": "image/jpeg" for bytes that are really PNG.
+  falStub({ result: { images: [{ url: 'https://v3b.fal.media/files/b/x/y.png', content_type: 'image/jpeg' }] } });
+  const out = await run();
+  assert.equal(out.mediaType, 'image/jpeg', 'we request jpeg, so we report jpeg regardless of fal');
 });
