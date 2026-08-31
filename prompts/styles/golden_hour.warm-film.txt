@@ -1,39 +1,11 @@
-TODO(style-instruction): golden_hour / Warm Film
+Edit this exact photograph with a sophisticated warm color-negative-film treatment. Keep the people, faces, identity, expression, body, pose, hands, hair, clothing, makeup, objects, background, text, composition, crop, perspective, and geometry unchanged. Do not retouch, beautify, reshape, reconstruct, add, remove, or move scene content. Change only the photographic tone, color response, texture, and extremely subtle highlight halation.
 
-PLACEHOLDER — not a usable instruction yet.
+Create the feeling of a premium 35mm color-negative photograph that was carefully scanned and professionally graded: warm, tactile, understated, nostalgic, cinematic, and timeless rather than obviously vintage. Use a gentle filmic tone curve with a very slight lift only at the deepest black floor, real shadow density above it, smooth dimensional midtones, and creamy highlights that roll off gradually instead of clipping. Blacks should remain convincingly dark, not gray or milky.
 
-No image model has been chosen, and instruction phrasing is model-specific
-(some want terse tag lists, some want prose, some want a strict edit verb),
-so writing one now would mean rewriting it later. What this file does instead
-is pin down the TARGET LOOK precisely, so whoever writes the real instruction
-is translating a known aesthetic rather than reinventing it.
+Make overall color naturally warm but less overtly golden than a sun-kissed filter. The warmth should feel embedded in the film color response. Keep skin natural, textured, and flattering with subtle cream, peach, and golden undertones; never make it orange, yellow, red, pink, waxy, or airbrushed. Keep whites slightly creamy or ivory. Preserve cool tones in sky, water, glass, denim, and shadows so the image has nuanced warm/cool separation.
 
-Replace everything below the ---- line with the real instruction. Keep the
-TODO(style-instruction) marker on line 1 until you do: /api/premium/generate
-reports placeholder instructions in DEBUG, so a wrong-looking render is never
-mistaken for an instruction nobody wrote.
+Render reds and oranges rich but controlled. Make greens organic and slightly restrained, with gentle olive or earthy character where the source supports it. Keep blues clean but a little less electronic than modern phone-camera color. Use slightly restrained global saturation while preserving selective richness in skin, food, flowers, clothing, and travel details.
 
-THE LOOK
-Warmer and more saturated than Sun-kissed, with a distinctly stronger magenta
-cast and noticeably more highlight bloom. Reads like warm colour film stock
-shot into low sun — richer and softer than Sun-kissed, not hazier.
+Add fine, organic, luminance-dominant film grain that is subtle at normal viewing size and never obscures faces or detail. Add only a trace of warm halation around genuinely intense highlights or practical lights; do not add light leaks, borders, date stamps, dust, scratches, sprocket holes, or fake film damage. Slightly reduce harsh computational microcontrast if present, but preserve actual focus, eyes, hair, skin texture, fabric, architecture, signs, and small details.
 
-WHAT BASIC TIER DOES
-The deterministic Core Image chain below is the same aesthetic, and premium
-must read as that look executed better — not as a different look. These are
-the app's own tuned values (duvro/Packs/golden_hour.json), hand-graded against
-reference images. Op order is
-temperatureTint -> colorControls -> vibrance -> toneCurve -> vignette ->
-bloom -> grain. Baseline temperature is 6500K, so a lower number is warmer.
-
-temperatureTint  temperature 5752, tint -32   (strongest magenta in the pack)
-colorControls    saturation 1.04, brightness -0.0069, contrast 0.99
-vibrance         0.14
-vignette         intensity 0.08, radius 1.4
-bloom            radius 39.7, intensity 0.14
-grain            intensity 0.012, size 1.0
-
-----
-Apply the look described above to this photograph. Preserve the subject,
-composition, framing, and all facial features exactly; change only colour,
-tone, and grain.
+Adapt the grade to the source. If it is already warm, focus on filmic tone and color response rather than adding more temperature. If it is cool, warm it while retaining useful blues and cyans. Preserve nighttime, flash, overcast, indoor, and daylight lighting as they actually exist; do not invent golden sunlight. The final image should feel like the same photograph rendered through beautiful warm film, not a digital image covered by a vintage filter.

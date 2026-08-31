@@ -1,41 +1,9 @@
-TODO(style-instruction): digicam / Light Leak
+Edit this exact photograph into a premium nostalgic light-leak digicam image. Keep the people, faces, identity, expression, body, pose, hands, hair, clothing, objects, background, text, composition, crop, perspective, and geometry unchanged. Do not retouch or reshape anyone, and do not add or remove scene content. Preserve the source's real lighting and moment. Change the photographic color, tone, texture, and add one restrained analog-style light leak near an edge of the frame.
 
-PLACEHOLDER — not a usable instruction yet.
+Keep the underlying image youthful, immediate, spontaneous, intimate, and slightly imperfect rather than polished into a studio photograph. Use lively compact-camera color with believable skin, fairly deep blacks, direct midtones, and highlights that can run a little hot when the source already supports that character. Preserve attractive motion blur, flash harshness, reflections, mirror messiness, and other imperfections when they are part of the original image.
 
-No image model has been chosen, and instruction phrasing is model-specific
-(some want terse tag lists, some want prose, some want a strict edit verb),
-so writing one now would mean rewriting it later. What this file does instead
-is pin down the TARGET LOOK precisely, so whoever writes the real instruction
-is translating a known aesthetic rather than reinventing it.
+Add one organic translucent light leak entering from a side or corner. It should be irregular, feathered, asymmetrical, and physically plausible, with a warm red-orange, amber, soft pink-red, or pale warm center chosen to suit the source. Let the leak partially wash local color and brightness while preserving the underlying image. Keep it away from the center of the face whenever possible and never obscure identity, eyes, or important scene information. The light leak should feel accidentally captured, not pasted on. Do not cover the whole frame, create multiple aggressive leaks, add rainbow prisms, starbursts, a fake sun, or a global orange overlay.
 
-Replace everything below the ---- line with the real instruction. Keep the
-TODO(style-instruction) marker on line 1 until you do: /api/premium/generate
-reports placeholder instructions in DEBUG, so a wrong-looking render is never
-mistaken for an instruction nobody wrote.
+Keep skin natural and textured. Correct only ugly color contamination that makes skin look unhealthy; do not tan, smooth, brighten, or beautify it. Preserve deep backgrounds and bright foregrounds in nighttime or flash images. In daylight, keep the leak softer and more sun-faded. In mirror photos, preserve the phone, reflection, smudges, and geometry exactly. Preserve aesthetically useful blur rather than trying to sharpen it away.
 
-THE LOOK
-Warm, saturated and punchy, with a red-orange light leak bleeding in from ONE
-corner (top-trailing) and heavy grain. Reads like a film compact that fogged a
-frame. The leak is corner-localised — a 25-35% falloff, peaking around 30-40%
-intensity — not a wash across the whole image.
-
-WHAT BASIC TIER DOES
-The deterministic Core Image chain below is the same aesthetic, and premium
-must read as that look executed better — not as a different look. These are
-the app's own tuned values (duvro/Packs/digicam.json), hand-graded against
-reference images. Op order is
-temperatureTint -> colorControls -> vibrance -> toneCurve -> vignette ->
-bloom -> grain. Baseline temperature is 6500K, so a lower number is warmer.
-
-temperatureTint  temperature 5439, tint -36   (warmest in this pack)
-colorControls    saturation 1.08, brightness 0.0, contrast 1.0
-vibrance         0.10
-vignette         intensity 0.07, radius 1.3
-bloom            radius 44.8, intensity 0.11
-lightLeak        intensity 0.35, corner topTrailing, red-orange
-grain            intensity 0.26, size 1.1   (heavy)
-
-----
-Apply the look described above to this photograph. Preserve the subject,
-composition, framing, and all facial features exactly; change only colour,
-tone, and grain.
+Add fine compact-camera/film texture, subtle enough to keep faces and text readable. Do not add white borders, date stamps, scratches, dust, paper texture, or fake camera UI. The final image should still be unmistakably the same photo, with one convincing edge light leak that makes it feel cooler, more nostalgic, and more postable rather than gimmicky.

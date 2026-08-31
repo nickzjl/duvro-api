@@ -1,41 +1,13 @@
-TODO(style-instruction): travel_film / Deep Teal
+Edit this exact photograph with a sophisticated deep-teal travel-film grade. Keep the people, faces, identity, expression, body, pose, hands, hair, clothing, makeup, objects, food, architecture, plants, sky, water, signs, vehicles, background, text, composition, crop, perspective, and geometry unchanged. Do not retouch or reshape anyone, replace the sky or water, invent weather, fog, rain, neon, sunset, or new lighting, and do not add/remove scene content.
 
-PLACEHOLDER — not a usable instruction yet.
+Create a cinematic, moody, transportive travel image with selective deep teal/cyan-blue depth in appropriate environmental shadows and cool materials, while protecting natural warm skin and believable highlights. This must not become a generic global teal-and-orange grade.
 
-No image model has been chosen, and instruction phrasing is model-specific
-(some want terse tag lists, some want prose, some want a strict edit verb),
-so writing one now would mean rewriting it later. What this file does instead
-is pin down the TARGET LOOK precisely, so whoever writes the real instruction
-is translating a known aesthetic rather than reinventing it.
+Use moderate-to-strong contrast with deep clean blacks, rich lower midtones, and controlled highlights that retain shape and detail. Keep black hair, black clothing, and truly neutral dark objects neutral enough to remain real. Introduce teal primarily into environmental shadow color, water, glass, blue surfaces, shaded foliage, urban ambience, steel, and naturally cool regions. Do not pour cyan over the whole frame.
 
-Replace everything below the ---- line with the real instruction. Keep the
-TODO(style-instruction) marker on line 1 until you do: /api/premium/generate
-reports placeholder instructions in DEBUG, so a wrong-looking render is never
-mistaken for an instruction nobody wrote.
+Protect skin as a separate visual priority. Keep the original complexion, texture, and natural peach/red/golden undertones. Do not turn skin teal, green, or artificially orange. Keep skin midtones warm-neutral while allowing the background and ambient shadows to become cooler. Highlights should remain neutral-warm or softly creamy rather than cyan.
 
-THE LOOK
-Cool, cinematic, teal-shadowed. Saturated and vibrant with the strongest
-vignette in the app. NOTE this is the ONLY variant anywhere in the app with a
-POSITIVE tint — it pushes green, not magenta, which is what produces the teal
-cast rather than a plain blue one. That direction was verified empirically and
-is deliberate; do not neutralise it.
+Deepen blues toward rich blue-teal only where the original material supports it. Keep cyans controlled and never neon. Shaded greens may cool toward forest/teal while sunlit foliage retains natural green/yellow influence. Preserve reds and oranges as restrained warm counterpoints in skin, food, signs, clothing, brick, and practical lights. Do not force teal into scenes that contain little natural blue or green; in those cases use cooler shadow neutrals and preserve the scene's material colors.
 
-WHAT BASIC TIER DOES
-The deterministic Core Image chain below is the same aesthetic, and premium
-must read as that look executed better — not as a different look. These are
-the app's own tuned values (duvro/Packs/travel_film.json), hand-graded against
-reference images. Op order is
-temperatureTint -> colorControls -> vibrance -> toneCurve -> vignette ->
-bloom -> grain. Baseline temperature is 6500K, so a lower number is warmer.
+Keep saturation moderate and achieve the look through selective color separation rather than global saturation. Add only fine restrained film-like texture and minimal bloom around genuine bright practical lights or reflections. Preserve faces, architecture, signs, food, foliage, water texture, and small travel details.
 
-temperatureTint  temperature 7151, tint +20   (cool, GREEN — the only positive tint in the app)
-colorControls    saturation 1.10, brightness 0.0, contrast 1.0
-vibrance         0.20
-vignette         intensity 0.16, radius 1.2   (strongest in the app)
-bloom            radius 44.8, intensity 0.13
-grain            intensity 0.12, size 1.0
-
-----
-Apply the look described above to this photograph. Preserve the subject,
-composition, framing, and all facial features exactly; change only colour,
-tone, and grain.
+Adapt to the source. Overcast, coastal, water, glass, forest, shaded-street, blue-hour, and urban scenes can take stronger environmental teal. Warm daylight scenes should retain their warm highlights with only plausible cool depth in shade. Interiors should keep practical lights warm-neutral and faces clean. Night scenes should preserve deep blacks and existing colored lights without adding fake neon. The final result should feel cinematic and premium while remaining unmistakably the same real place and the same photograph.

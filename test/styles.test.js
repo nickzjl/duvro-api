@@ -35,24 +35,44 @@ test('every one of the nine pairs loads a non-empty instruction file', () => {
   }
 });
 
-test('every instruction is currently a placeholder, and says so', () => {
-  // When a real instruction is written this test should be updated, not deleted:
-  // the point is that placeholder-ness is always known, never assumed.
+test('isPlaceholder detects both states — the mechanism, not the current data', () => {
+  // The original of this test asserted all nine WERE placeholders and said to
+  // update rather than delete it when real instructions landed. All nine are
+  // now written, so what is worth protecting is the detector itself: a
+  // placeholder must be recognised, and real prose must not trip it.
+  assert.ok(isPlaceholder(`${PLACEHOLDER_MARKER}: golden_hour / Sun-kissed\n\nnot written yet`));
+  assert.ok(!isPlaceholder('Edit this exact photograph with a warm golden-hour grade.'));
+});
+
+test('all nine instructions are written — and the count is asserted, never assumed', () => {
+  const placeholders = ALL_STYLES.filter(({ pack, variant }) =>
+    isPlaceholder(loadStyleInstruction(pack, variant)));
+  assert.deepEqual(
+    placeholders.map((p) => `${p.pack}/${p.variant}`), [],
+    'a style file regressed to a placeholder, or a new one was added unwritten',
+  );
+});
+
+test('every instruction is substantial, so an empty or truncated file is caught', () => {
   for (const { pack, variant } of ALL_STYLES) {
-    const text = loadStyleInstruction(pack, variant);
-    assert.ok(
-      isPlaceholder(text),
-      `${pack}/${variant} lost its ${PLACEHOLDER_MARKER} marker — if the real instruction was written, update this test`,
-    );
+    const text = loadStyleInstruction(pack, variant).trim();
+    assert.ok(text.length > 500, `${pack}/${variant} is only ${text.length} chars — truncated?`);
   }
 });
 
-test('each placeholder names its own pack and variant, so files cannot be silently swapped', () => {
+test('the nine instructions are pairwise distinct, so files cannot be silently swapped', () => {
+  // Replaces the old marker-based anti-swap check: with real prose there is no
+  // header naming the pack, but two variants sharing a body is still a bug.
+  const seen = new Map();
   for (const { pack, variant } of ALL_STYLES) {
-    const text = loadStyleInstruction(pack, variant);
-    assert.ok(text.includes(pack), `${pack}/${variant} should name its pack`);
-    assert.ok(text.includes(variant), `${pack}/${variant} should name its variant`);
+    const text = loadStyleInstruction(pack, variant).trim();
+    const key = `${pack}/${variant}`;
+    if (seen.has(text)) {
+      assert.fail(`${key} has identical content to ${seen.get(text)}`);
+    }
+    seen.set(text, key);
   }
+  assert.equal(seen.size, 9);
 });
 
 test('variant names are matched case- and whitespace-insensitively', () => {

@@ -1,42 +1,11 @@
-TODO(style-instruction): golden_hour / Soft Glow
+Edit this exact photograph with a refined soft-glow golden-hour treatment. Keep the people, faces, identity, expression, body shape, pose, hands, hair, clothing, makeup, objects, background, text, composition, crop, perspective, and geometry unchanged. Do not retouch, beautify, smooth, reshape, reconstruct, add, remove, or move anything. Change only color, tone, exposure balance, contrast, and localized optical-style bloom around real highlights.
 
-PLACEHOLDER — not a usable instruction yet.
+Make the image luminous, romantic, airy, flattering, and high-end while preserving true photographic detail. Use warm-neutral cream and peach color rather than strong orange, yellow, or pink. Keep skin exactly recognizable as the original person's complexion, with pores and texture intact; create luminosity through light and tonal treatment, not beauty retouching.
 
-No image model has been chosen, and instruction phrasing is model-specific
-(some want terse tag lists, some want prose, some want a strict edit verb),
-so writing one now would mean rewriting it later. What this file does instead
-is pin down the TARGET LOOK precisely, so whoever writes the real instruction
-is translating a known aesthetic rather than reinventing it.
+Use a soft tone curve with gently opened midtones, slightly softened shadow contrast, a real dark anchor in the blacks, and smooth compressed highlights. Overall contrast should be lower than a punchy digital photo but not flat or washed out. Preserve local definition around eyes, eyebrows, eyelashes, lips, hair, jewelry, fabric, architecture, foliage, and text.
 
-Replace everything below the ---- line with the real instruction. Keep the
-TODO(style-instruction) marker on line 1 until you do: /api/premium/generate
-reports placeholder instructions in DEBUG, so a wrong-looking render is never
-mistaken for an instruction nobody wrote.
+The signature effect is controlled highlight bloom. Let genuine bright areas such as sunlit hair, bright windows, reflections, practical lights, water sparkle, or naturally bright skin highlights feather softly into nearby pixels with a smooth medium-radius falloff. The bloom must be luminance-driven and localized. Do not blur the whole image, glow dark objects, smear hair, soften facial features, erase skin texture, or create halos around every edge. Do not add fake sunlight, rays, or lens flare.
 
-THE LOOK
-The diffused one. Near-neutral temperature, desaturated, and dominated by a
-large highlight-concentrated glow — the heaviest bloom in the pack by a wide
-margin — with the finest grain. Hazy and luminous. IMPORTANT: the glow must
-stay concentrated in the highlights; an even white wash over the whole frame
-is the specific failure this variant has already had once (see the pack's
-tuning notes), and it is what the shadows staying properly dark prevents.
+Keep whites soft ivory, blues clean and gentle, greens slightly softened but natural, and reds/pinks controlled. Use moderate or slightly restrained saturation with nuanced color separation rather than a pastel wash. If texture is needed, use only extremely fine subtle grain.
 
-WHAT BASIC TIER DOES
-The deterministic Core Image chain below is the same aesthetic, and premium
-must read as that look executed better — not as a different look. These are
-the app's own tuned values (duvro/Packs/golden_hour.json), hand-graded against
-reference images. Op order is
-temperatureTint -> colorControls -> vibrance -> toneCurve -> vignette ->
-bloom -> grain. Baseline temperature is 6500K, so a lower number is warmer.
-
-temperatureTint  temperature 6030, tint -28   (closest to neutral 6500K)
-colorControls    saturation 0.93, brightness 0.0, contrast 0.98
-vibrance         0.05
-vignette         intensity 0.05, radius 1.6
-bloom            radius 76.8, intensity 0.24   (largest bloom in the pack)
-grain            intensity 0.01, size 0.8
-
-----
-Apply the look described above to this photograph. Preserve the subject,
-composition, framing, and all facial features exactly; change only colour,
-tone, and grain.
+Adapt to the source. If the source already has soft light, use very little additional bloom. If it has harsh midday light, soften highlight transitions and digital contrast while preserving the real shadow direction. If it is overcast or indoors, create creamier luminous color without inventing sunlight. If it is nighttime, preserve darkness and let existing practical lights provide the glow. If it uses direct flash, preserve the flash character and keep the subject crisp while softening only the harshest highlight transitions. The finished result should be dreamy because of light and tone, not because detail was lost.

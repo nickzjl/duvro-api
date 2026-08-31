@@ -1,39 +1,11 @@
-TODO(style-instruction): travel_film / Kodak Style
+Edit this exact photograph with a premium Kodak-inspired color-negative travel-film look. Keep the people, faces, identity, expression, body, pose, hands, hair, clothing, objects, food, architecture, signs, landscape, sky, water, background, text, composition, crop, perspective, and geometry unchanged. Do not retouch or reshape anyone, replace the sky, invent a more attractive location, remove travel details, or add/remove scene content.
 
-PLACEHOLDER — not a usable instruction yet.
+Create a richly colored, warm, tactile, cinematic travel photograph with classic color-negative sensibility: inviting skin, warm sunlight response, confident blues, organic greens, rich reds, dimensional earth tones, smooth highlight roll-off, grounded blacks, and fine film grain. The result should make the location feel more memorable without falsifying it.
 
-No image model has been chosen, and instruction phrasing is model-specific
-(some want terse tag lists, some want prose, some want a strict edit verb),
-so writing one now would mean rewriting it later. What this file does instead
-is pin down the TARGET LOOK precisely, so whoever writes the real instruction
-is translating a known aesthetic rather than reinventing it.
+Use moderate-to-rich contrast. Keep blacks grounded with only the slightest analog lift at the absolute floor, preserve dimensional lower midtones, and let bright areas roll off smoothly rather than clipping harshly. Use a slightly warm overall balance that responds to the scene instead of coating everything in orange. Keep skin natural and textured with subtle peach/golden warmth; never tan, smooth, whiten, or make it orange.
 
-Replace everything below the ---- line with the real instruction. Keep the
-TODO(style-instruction) marker on line 1 until you do: /api/premium/generate
-reports placeholder instructions in DEBUG, so a wrong-looking render is never
-mistaken for an instruction nobody wrote.
+Render reds rich and tactile without neon clipping. Keep yellows warm but protect white and cream surfaces from yellow contamination. Make greens lush but organic, with natural variation between sunlight and shade rather than electric grass. Keep blues deep, clean, and confident in sky, water, glass, and clothing without pushing them into artificial cyan. Preserve stone, wood, sand, brick, food, signs, markets, street clutter, and cultural details with specific local color.
 
-THE LOOK
-Classic warm colour-negative film: warm, the most saturated variant in its
-pack, with lifted vibrance and moderate grain. Rich and slightly nostalgic
-without being faded — the opposite end of this pack from Faded Postcard.
+Use moderate selective saturation: more colorful than a faded postcard, but not a tourism-ad HDR look. Add fine organic color-negative grain and only the faintest halation around genuine intense highlights. Reduce harsh computational-phone microcontrast if necessary while preserving faces, architecture, signs, foliage, food, and small environmental details.
 
-WHAT BASIC TIER DOES
-The deterministic Core Image chain below is the same aesthetic, and premium
-must read as that look executed better — not as a different look. These are
-the app's own tuned values (duvro/Packs/travel_film.json), hand-graded against
-reference images. Op order is
-temperatureTint -> colorControls -> vibrance -> toneCurve -> vignette ->
-bloom -> grain. Baseline temperature is 6500K, so a lower number is warmer.
-
-temperatureTint  temperature 5352, tint -20   (warmest in this pack)
-colorControls    saturation 1.12, brightness 0.0, contrast 1.0
-vibrance         0.20
-vignette         intensity 0.07, radius 1.4
-bloom            radius 47.36, intensity 0.15
-grain            intensity 0.20, size 1.2
-
-----
-Apply the look described above to this photograph. Preserve the subject,
-composition, framing, and all facial features exactly; change only colour,
-tone, and grain.
+Adapt to the source. Sunny images can carry warmer highlights and richer blues/greens; overcast images should gain filmic richness without fake sunlight; beach images should preserve realistic water and sand; city images should retain architectural materials and signage; interiors should remain believable under practical lighting; night scenes should preserve darkness and colored lights rather than being forced warm. The final result should feel like the same travel moment captured on beautiful color-negative film, not a generic warm filter.

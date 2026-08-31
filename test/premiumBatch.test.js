@@ -326,7 +326,10 @@ test('progress reports placeholder instructions, so a wrong look is never mistak
     deadlineAt: farDeadline(), provider: ok, env: {},
     onProgress: (e) => events.push(e),
   });
-  assert.equal(events[0].placeholderInstructions, 3);
+  // All nine instructions are now written, so this is 0. The field still earns
+  // its place: it is how an unwritten instruction would surface in DEBUG rather
+  // than being mistaken for a wrong-looking render.
+  assert.equal(events[0].placeholderInstructions, 0);
 });
 
 test('a throwing progress consumer does not take the batch down', async () => {

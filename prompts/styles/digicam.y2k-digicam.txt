@@ -1,44 +1,11 @@
-TODO(style-instruction): digicam / Y2K Digicam
+Edit this exact photograph with an early-2000s compact digital-camera look. Keep the people, faces, identity, expression, body, pose, hands, hair, clothing, makeup, objects, background, text, composition, crop, perspective, and geometry unchanged. Do not retouch, beautify, smooth, reshape, reconstruct, add, remove, or move anything. Preserve the actual source lighting; if there is no flash in the source, do not invent flash or new hard shadows.
 
-PLACEHOLDER — not a usable instruction yet.
+Create a direct, playful, youthful Y2K digicam rendering: slightly raw, crisp, social, nightlife-friendly, and digitally nostalgic rather than filmic. Use stronger compact-camera contrast than the Polaroid variant, with fairly deep blacks, direct bright midtones, and highlights that can feel a little hot when the original scene supports it. Avoid HDR recovery and avoid faded film blacks.
 
-No image model has been chosen, and instruction phrasing is model-specific
-(some want terse tag lists, some want prose, some want a strict edit verb),
-so writing one now would mean rewriting it later. What this file does instead
-is pin down the TARGET LOOK precisely, so whoever writes the real instruction
-is translating a known aesthetic rather than reinventing it.
+If the source already uses direct flash, preserve its authentic character: bright foreground subject, fast falloff into a darker background, hard but plausible shadows, and reflective highlights on skin, jewelry, glass, satin, or glossy surfaces. Do not smooth away real flash texture. If the source is not flash-lit, keep the existing light and apply only the compact-digital color, contrast, and texture character.
 
-Replace everything below the ---- line with the real instruction. Keep the
-TODO(style-instruction) marker on line 1 until you do: /api/premium/generate
-reports placeholder instructions in DEBUG, so a wrong-looking render is never
-mistaken for an instruction nobody wrote.
+Keep skin natural, textured, and recognizable. Under flash it may be bright and immediate, but never smooth, orange, green, or artificially beautified. Use neutral to slightly cool overall color depending on the source, with lively reds, crisp blues/cyans, and slightly punchier primary colors. Preserve imperfect mixed lighting when it looks authentic and attractive.
 
-THE LOOK
-Early-2000s point-and-shoot with the flash on: the coolest, most saturated and
-most vibrant variant in the app, with both the heaviest bloom and the heaviest
-grain, plus a small yellow date stamp in the bottom-right corner. Harsh and
-nostalgic, deliberately over-processed. NOTE the date stamp is a composite
-overlay of the photo's own capture date, not invented text — if the provider
-cannot place accurate text, generate the graded image only and let the app
-stamp it.
+Keep true focus as captured. A crisp source may retain slightly hard compact-camera edge character, but avoid modern AI oversharpening, halos, and crunchy pores. Preserve aesthetically useful motion blur. Add fine small-sensor digital texture, especially in low-light shadows; a trace of subtle chroma noise is acceptable, but do not create visible JPEG blocks, low-resolution artifacts, or coarse static.
 
-WHAT BASIC TIER DOES
-The deterministic Core Image chain below is the same aesthetic, and premium
-must read as that look executed better — not as a different look. These are
-the app's own tuned values (duvro/Packs/digicam.json), hand-graded against
-reference images. Op order is
-temperatureTint -> colorControls -> vibrance -> toneCurve -> vignette ->
-bloom -> grain. Baseline temperature is 6500K, so a lower number is warmer.
-
-temperatureTint  temperature 8275, tint -20   (coolest in the app)
-colorControls    saturation 1.08, brightness 0.0, contrast 1.0
-vibrance         0.19
-vignette         intensity 0.12, radius 1.2
-bloom            radius 102.4, intensity 0.26   (largest bloom in the app)
-grain            intensity 0.32, size 0.8       (heaviest grain in the app)
-dateStamp        bottom-trailing, scale 0.035, yellow digital numerals
-
-----
-Apply the look described above to this photograph. Preserve the subject,
-composition, framing, and all facial features exactly; change only colour,
-tone, and grain.
+Keep mirrors, phones, reflections, smudges, club lights, signs, and messy social environments exactly as they are. Do not add a date stamp, camera UI, border, watermark, light leak, or fake timestamp. The final result should feel like an unexpectedly great frame from a real early-2000s compact digicam, not a modern image with a fake retro overlay.

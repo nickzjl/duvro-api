@@ -1,40 +1,11 @@
-TODO(style-instruction): golden_hour / Sun-kissed
+Edit this exact photograph with a refined sun-kissed golden-hour color treatment. Keep the people, faces, identity, expression, body shape, pose, hands, hair, clothing, makeup, objects, background, text, composition, crop, perspective, and geometry unchanged. Do not retouch, beautify, reshape, reconstruct, add, remove, or move anything in the scene. Change only the photographic color and tonal rendering, with very subtle highlight bloom where physically plausible.
 
-PLACEHOLDER — not a usable instruction yet.
+Make the image feel naturally warmed by beautiful late-afternoon light: luminous, flattering, relaxed, summery, polished, and expensive, without looking filtered. Use moderate golden-peach warmth rather than an orange or yellow cast. Keep skin true to the original person, with natural texture and complexion; give illuminated skin a subtle healthy peach-gold warmth without tanning, whitening, smoothing, or changing facial detail. Keep whites warm ivory rather than yellow.
 
-No image model has been chosen, and instruction phrasing is model-specific
-(some want terse tag lists, some want prose, some want a strict edit verb),
-so writing one now would mean rewriting it later. What this file does instead
-is pin down the TARGET LOOK precisely, so whoever writes the real instruction
-is translating a known aesthetic rather than reinventing it.
+Use smooth, luminous highlights with a gentle champagne-gold bias and graceful roll-off. Preserve useful highlight detail in faces, clothing, sky, walls, and reflective surfaces. Gently open and warm the midtones while retaining facial and body dimension. Keep shadows deep enough to anchor the image and slightly more neutral or cool than the highlights, so the grade has warm/cool separation instead of an orange wash. Use moderate flattering contrast, no HDR look, no crushed blacks, and no heavy faded-black effect.
 
-Replace everything below the ---- line with the real instruction. Keep the
-TODO(style-instruction) marker on line 1 until you do: /api/premium/generate
-reports placeholder instructions in DEBUG, so a wrong-looking render is never
-mistaken for an instruction nobody wrote.
+Keep blues in sky, water, denim, glass, and shadows clean enough to complement the warm skin and highlights. Make greens slightly more organic and less electronic only when needed. Keep reds, food, flowers, clothing, and environmental colors rich but believable. Prefer selective vibrance to strong global saturation.
 
-THE LOOK
-Warm late-afternoon daylight, and the most restrained of this pack's three.
-Gently warmed, a touch of magenta, very slightly desaturated with a small
-contrast lift. Barely any bloom or grain. This is the pack's signature look:
-it is variants[0], so it is pre-selected on arrival and leads the showcase.
+Add only a faint optical bloom around genuine bright highlights such as sunlit hair, reflective water, windows, or naturally bright skin highlights. Do not create fake sun rays, a new sun, lens flare, new directional light, or new shadows. Keep eyes, eyelashes, hair strands, skin texture, fabric, jewelry, text, and environmental detail sharp.
 
-WHAT BASIC TIER DOES
-The deterministic Core Image chain below is the same aesthetic, and premium
-must read as that look executed better — not as a different look. These are
-the app's own tuned values (duvro/Packs/golden_hour.json), hand-graded against
-reference images. Op order is
-temperatureTint -> colorControls -> vibrance -> toneCurve -> vignette ->
-bloom -> grain. Baseline temperature is 6500K, so a lower number is warmer.
-
-temperatureTint  temperature 5623, tint -16   (warm, slight magenta)
-colorControls    saturation 0.96, brightness -0.0647, contrast 1.05
-vibrance         0.07
-vignette         intensity 0.10, radius 1.2
-bloom            radius 16.6, intensity 0.04   (smallest bloom in the pack)
-grain            intensity 0.024, size 1.3
-
-----
-Apply the look described above to this photograph. Preserve the subject,
-composition, framing, and all facial features exactly; change only colour,
-tone, and grain.
+Adapt the treatment to the source instead of forcing the same strength onto every image. If the photo is already warm, refine it rather than warming it again. If it is overcast, shaded, indoors, nighttime, or direct-flash, preserve that actual lighting and apply a compatible warm color treatment rather than pretending the scene was shot at sunset. The final result should still look unquestionably like the original photograph, only more naturally sun-kissed, luminous, flattering, and cohesive.
