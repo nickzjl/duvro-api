@@ -338,7 +338,12 @@ async function main() {
     const dl = await fetch(outUrl);
     const buf = Buffer.from(await dl.arrayBuffer());
     const slug = `${pair.pack}.${pair.variant.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
-    const file = path.join(opts.outDir, `${slug}__g${pair.guidance}__seed${opts.seed}.png`);
+    // The SOURCE must be in the filename. Without it a second run on a
+    // different photo at the same (variant, guidance, seed) silently
+    // overwrites the first — which is exactly what happened the first time
+    // this tool was used, destroying one of eight sweep outputs.
+    const srcStem = path.basename(opts.image).replace(/\.[^.]*$/, '').replace(/[^A-Za-z0-9]+/g, '-');
+    const file = path.join(opts.outDir, `${srcStem}__${slug}__g${pair.guidance}__seed${opts.seed}.png`);
     await writeFile(file, buf);
 
     const infer = gen.metrics?.inference_time;
